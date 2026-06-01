@@ -140,7 +140,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </form>
 
         {/* First time help notice */}
-        <div style={{
+       {/*  <div style={{
           marginTop: '1.5rem',
           fontSize: '0.75rem',
           color: 'var(--text-muted)',
@@ -152,7 +152,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         }}>
           Nota: <strong>Primer acceso:</strong> Si es la primera vez que inicias, ingresa con: <br />
           <span style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>admin@jnsix.com</span> / <span style={{ color: 'var(--accent)', fontFamily: 'monospace' }}>admin123</span>
-        </div>
+        </div> */}
       </div>
     </div>
   );
