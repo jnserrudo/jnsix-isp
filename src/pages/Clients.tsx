@@ -183,7 +183,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   return (
     <div className="page-container">
       {/* Header section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="title-block">
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Clientes</h2>
           <span style={{ color: 'var(--text-muted)' }}>Lista de usuarios de red y contratos</span>
@@ -243,19 +243,26 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             <thead>
               <tr>
                 <th>Nombre Completo</th>
-                <th>DNI / Identificación</th>
-                <th>Contacto</th>
+                <th className="desktop-only">DNI / Identificación</th>
+                <th className="desktop-only">Contacto</th>
                 <th>Estado</th>
-                <th>Dirección</th>
+                <th className="desktop-only">Dirección</th>
                 <th style={{ textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {paginatedClients.map((client) => (
                 <tr key={client.id}>
-                  <td style={{ fontWeight: 600 }}>{client.fullName}</td>
-                  <td>{client.dni}</td>
-                  <td>{client.phone1 || client.email || 'Sin contacto'}</td>
+                  <td style={{ fontWeight: 600 }}>
+                    <div>{client.fullName}</div>
+                    <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.25rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                      DNI: {client.dni} <br />
+                      Tel: {client.phone1 || 'Sin contacto'} <br />
+                      Dir: {client.address}
+                    </div>
+                  </td>
+                  <td className="desktop-only">{client.dni}</td>
+                  <td className="desktop-only">{client.phone1 || client.email || 'Sin contacto'}</td>
                   <td>
                     <span className={`badge ${
                       client.status === 'ACTIVE' ? 'badge-active' :
@@ -267,7 +274,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                        client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
                     </span>
                   </td>
-                  <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td className="desktop-only" style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {client.address}
                   </td>
                   <td style={{ textAlign: 'right', position: 'relative' }}>

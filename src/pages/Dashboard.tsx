@@ -169,7 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   return (
     <div className="page-container">
       {/* Title block */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="title-block">
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Panel de Control</h2>
           <span style={{ color: 'var(--text-muted)' }}>Métricas e infraestructura en tiempo real</span>
@@ -247,9 +247,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
       )}
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)' }}>
+      <div className="grid grid-cols-4 kpi-grid" style={{ marginBottom: '2rem' }}>
+        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
             <Users size={28} color="var(--accent)" />
           </div>
           <div>
@@ -258,8 +258,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
           </div>
         </div>
 
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ border: '1px solid var(--color-danger-border)', padding: '0.75rem', backgroundColor: 'var(--color-danger-bg)' }}>
+        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div className="icon-wrapper" style={{ border: '1px solid var(--color-danger-border)', padding: '0.75rem', backgroundColor: 'var(--color-danger-bg)', display: 'flex' }}>
             <WifiOff size={28} color="var(--color-danger)" />
           </div>
           <div>
@@ -268,8 +268,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
           </div>
         </div>
 
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)' }}>
+        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
             <TrendingUp size={28} color="var(--accent)" />
           </div>
           <div>
@@ -278,8 +278,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
           </div>
         </div>
 
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)' }}>
+        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div className="icon-wrapper" style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)', display: 'flex' }}>
             <AlertCircle size={28} color="var(--color-warning)" />
           </div>
           <div>

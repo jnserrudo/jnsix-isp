@@ -147,6 +147,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
 
+  // Responsive Mobile Navigation State
+  const [mobileTab, setMobileTab] = useState<'info' | 'network' | 'billing'>('info');
+
   // Diagnostics State
   const [isDiagnosticsLoading, setIsDiagnosticsLoading] = useState(false);
   const [diagnosticsData, setDiagnosticsData] = useState<{
@@ -588,11 +591,75 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         </p>
       </div>
 
+      {/* Mobile Tab Bar (Visible on mobile only, hidden on desktop) */}
+      <div className="mobile-only" style={{ display: 'flex', border: '1px solid var(--border-color)', borderBottom: 'none', marginBottom: '1.5rem', backgroundColor: 'var(--bg-secondary)' }}>
+        <button 
+          className="btn"
+          onClick={() => setMobileTab('info')}
+          style={{ 
+            flex: 1, 
+            padding: '0.85rem 0.5rem', 
+            backgroundColor: mobileTab === 'info' ? 'var(--bg-tertiary)' : 'transparent', 
+            border: 'none', 
+            borderBottom: mobileTab === 'info' ? '3px solid var(--accent)' : '3px solid transparent', 
+            color: mobileTab === 'info' ? '#ffffff' : 'var(--text-muted)', 
+            fontSize: '0.78rem', 
+            fontWeight: 700, 
+            textTransform: 'uppercase', 
+            borderRadius: 0,
+            transition: 'all 0.2s ease',
+            cursor: 'pointer'
+          }}
+        >
+          Ficha y Mapa
+        </button>
+        <button 
+          className="btn"
+          onClick={() => setMobileTab('network')}
+          style={{ 
+            flex: 1, 
+            padding: '0.85rem 0.5rem', 
+            backgroundColor: mobileTab === 'network' ? 'var(--bg-tertiary)' : 'transparent', 
+            border: 'none', 
+            borderBottom: mobileTab === 'network' ? '3px solid var(--accent)' : '3px solid transparent', 
+            color: mobileTab === 'network' ? '#ffffff' : 'var(--text-muted)', 
+            fontSize: '0.78rem', 
+            fontWeight: 700, 
+            textTransform: 'uppercase', 
+            borderRadius: 0,
+            transition: 'all 0.2s ease',
+            cursor: 'pointer'
+          }}
+        >
+          Contrato y Red
+        </button>
+        <button 
+          className="btn"
+          onClick={() => setMobileTab('billing')}
+          style={{ 
+            flex: 1, 
+            padding: '0.85rem 0.5rem', 
+            backgroundColor: mobileTab === 'billing' ? 'var(--bg-tertiary)' : 'transparent', 
+            border: 'none', 
+            borderBottom: mobileTab === 'billing' ? '3px solid var(--accent)' : '3px solid transparent', 
+            color: mobileTab === 'billing' ? '#ffffff' : 'var(--text-muted)', 
+            fontSize: '0.78rem', 
+            fontWeight: 700, 
+            textTransform: 'uppercase', 
+            borderRadius: 0,
+            transition: 'all 0.2s ease',
+            cursor: 'pointer'
+          }}
+        >
+          Facturas
+        </button>
+      </div>
+
       {/* Main Grid: Details left, Map right */}
-      <div className="grid grid-cols-3" style={{ marginBottom: '2rem', alignItems: 'start' }}>
+      <div className={`grid grid-cols-3 ${mobileTab === 'info' ? '' : 'desktop-only'}`} style={{ marginBottom: '2rem', alignItems: 'start' }}>
         {/* Customer Information Column */}
-        <div className="card" style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+        <div className="card col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="title-block" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{client.fullName}</h2>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • ID: {client.id.slice(0,8)}</span>
@@ -697,7 +764,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         </div>
 
         {/* GPS Location Map */}
-        <div style={{ gridColumn: 'span 1', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="col-span-1" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div className="card" style={{ padding: '1rem', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <MapPin size={18} color="var(--accent)" /> Ubicación Geográfica
@@ -749,7 +816,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       </div>
 
       {/* Contracts Section */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      <div className={`card ${mobileTab === 'network' ? '' : 'desktop-only'}`} style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Contrato y Servicio Técnico</h3>
           {client.contracts.length === 0 && userRole !== 'READONLY' && (
@@ -812,7 +879,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       </div>
 
       {/* Network Diagnostics Panel */}
-      <div className="card" style={{ marginBottom: '2rem' }}>
+      <div className={`card ${mobileTab === 'network' ? '' : 'desktop-only'}`} style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
             <Radio size={18} color="var(--accent)" /> Diagnóstico Técnico Avanzado en Vivo
@@ -1102,7 +1169,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-4" style={{ gap: '1.5rem', marginTop: '0.25rem' }}>
+              <div className="grid grid-cols-4 ping-grid" style={{ gap: '1.5rem', marginTop: '0.25rem' }}>
                 <div>
                   <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block' }}>Latencia Promedio</span>
                   <span style={{ fontSize: '1.1rem', fontWeight: 700, fontFamily: 'monospace', color: '#ffffff' }}>
@@ -1155,7 +1222,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       </div>
 
       {/* Invoices History section */}
-      <div className="grid grid-cols-2" style={{ gap: '2rem' }}>
+      <div className={`grid grid-cols-2 ${mobileTab === 'billing' ? '' : 'desktop-only'}`} style={{ gap: '2rem' }}>
         {/* Invoices Card */}
         <div className="card">
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1747,9 +1814,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               <X size={18} />
             </button>
             
-            <div className="modal-body" id="invoice-print-area" style={{ backgroundColor: '#ffffff', color: '#000000', padding: '2.5rem', border: '1px solid #000000', borderRadius: '0', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="modal-body invoice-print-container" id="invoice-print-area">
               {/* Invoice Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000000', paddingBottom: '1rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '2px solid #000000', paddingBottom: '1rem' }}>
                 <div>
                   <h2 style={{ fontFamily: 'var(--font-display)', color: '#000000', fontSize: '1.75rem', fontWeight: 800 }}>JNSIX ISP</h2>
                   <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>Red de Fibra Óptica FTTH</span>
@@ -1764,7 +1831,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               </div>
 
               {/* Client & Billing info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.82rem', borderBottom: '1px solid #dddddd', paddingBottom: '1rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.82rem', borderBottom: '1px solid #dddddd', paddingBottom: '1rem' }}>
                 <div>
                   <strong style={{ display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase', color: '#555555', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Cliente / Abonado</strong>
                   <span style={{ fontSize: '0.95rem', fontWeight: 700, display: 'block' }}>{client?.fullName}</span>
@@ -1802,7 +1869,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               </div>
 
               {/* Summary and Payment instructions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', borderTop: '2px solid #000000', paddingTop: '1rem', fontSize: '0.8rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', borderTop: '2px solid #000000', paddingTop: '1rem', fontSize: '0.8rem' }}>
                 <div>
                   <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#555555' }}>Instrucciones de Pago:</strong>
                   <span>Realizar transferencia bancaria al CBU: <strong>0000003100012345678901</strong></span><br />

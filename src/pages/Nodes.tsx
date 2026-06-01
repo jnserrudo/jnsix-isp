@@ -206,7 +206,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   return (
     <div className="page-container">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="title-block">
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Nodos e Infraestructura</h2>
           <span style={{ color: 'var(--text-muted)' }}>Routers MikroTik core de distribución y OLTs de fibra</span>
@@ -523,7 +523,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                 </div>
 
                 <div className="grid grid-cols-3" style={{ gap: '1rem' }}>
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <div className="form-group col-span-2">
                     <label>IP / Host Pública o Local *</label>
                     <input type="text" placeholder="Ej: 190.111.45.12 o 192.168.88.1" value={host} onChange={e => setHost(e.target.value)} required />
                   </div>
@@ -548,7 +548,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                 <h4 style={{ fontSize: '0.95rem', marginBottom: '0.75rem', color: 'var(--text-muted)' }}>Configuración de OLT FTH (Opcional)</h4>
 
                 <div className="grid grid-cols-3" style={{ gap: '1rem' }}>
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <div className="form-group col-span-2">
                     <label>IP Host de OLT V-SOL</label>
                     <input type="text" placeholder="Ej: 192.168.10.10" value={oltHost} onChange={e => setOltHost(e.target.value)} />
                   </div>

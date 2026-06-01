@@ -208,9 +208,11 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   return (
     <div className="page-container">
       {/* Title */}
-      <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Facturación y Cobros</h2>
-        <span style={{ color: 'var(--text-muted)' }}>Historial general de emisión y cobranza</span>
+      <div className="title-block">
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Facturación y Cobros</h2>
+          <span style={{ color: 'var(--text-muted)' }}>Historial general de emisión y cobranza</span>
+        </div>
       </div>
 
       {/* Educational description box */}
@@ -257,29 +259,63 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
           <table>
             <thead>
               <tr>
-                <th>N° Factura</th>
+                <th className="desktop-only">N° Factura</th>
                 <th>Cliente</th>
-                <th>Plan Contratado</th>
+                <th className="desktop-only">Plan Contratado</th>
                 <th>Monto</th>
-                <th>F. Vencimiento</th>
-                <th>Estado</th>
+                <th className="desktop-only">F. Vencimiento</th>
+                <th className="desktop-only">Estado</th>
                 {userRole !== 'READONLY' && <th style={{ textAlign: 'right' }}>Acciones</th>}
               </tr>
             </thead>
             <tbody>
               {paginatedInvoices.map((inv) => (
                 <tr key={inv.id}>
-                  <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{inv.invoiceNumber}</td>
-                  <td>{inv.client.fullName}</td>
-                  <td>{inv.contract.plan.name}</td>
-                  <td style={{ fontWeight: 700 }}>${Number(inv.amount).toLocaleString()} ARS</td>
+                  <td className="desktop-only" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                    {inv.invoiceNumber}
+                  </td>
                   <td>
+                    <div style={{ fontWeight: 600 }}>{inv.client.fullName}</div>
+                    <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                      N°: {inv.invoiceNumber} <br />
+                      Plan: {inv.contract.plan.name}
+                    </div>
+                  </td>
+                  <td className="desktop-only">{inv.contract.plan.name}</td>
+                  <td>
+                    <div style={{ fontWeight: 700 }}>${Number(inv.amount).toLocaleString()} ARS</div>
+                    <div className="mobile-only" style={{ marginTop: '0.25rem' }}>
+                      {(() => {
+                        const graceLimitDate = new Date(inv.dueDate);
+                        graceLimitDate.setDate(graceLimitDate.getDate() + inv.contract.graceDays);
+                        const isGraceExpired = new Date() > graceLimitDate;
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <div>
+                              <span className={`badge ${
+                                inv.status === 'PAID' ? 'badge-active' :
+                                isGraceExpired ? 'badge-suspended' : 'badge-delinquent'
+                              }`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
+                                {inv.status === 'PAID' ? 'Pagada' :
+                                 isGraceExpired ? 'Vencida' : 'Pendiente'}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: inv.status === 'PAID' ? 'var(--color-success)' : isGraceExpired ? 'var(--accent)' : 'var(--color-warning)', fontWeight: 600 }}>
+                              Vence: {new Date(inv.dueDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </td>
+                  <td className="desktop-only">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Calendar size={14} color="var(--text-muted)" />
                       <span>{new Date(inv.dueDate).toLocaleDateString()}</span>
                     </div>
                   </td>
-                  <td>
+                  <td className="desktop-only">
                     {(() => {
                       const graceLimitDate = new Date(inv.dueDate);
                       graceLimitDate.setDate(graceLimitDate.getDate() + inv.contract.graceDays);
@@ -611,9 +647,9 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
               <X size={18} />
             </button>
             
-            <div className="modal-body" id="invoice-print-area-billing" style={{ backgroundColor: '#ffffff', color: '#000000', padding: '2.5rem', border: '1px solid #000000', borderRadius: '0', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="modal-body invoice-print-container" id="invoice-print-area-billing">
               {/* Invoice Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000000', paddingBottom: '1rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '2px solid #000000', paddingBottom: '1rem' }}>
                 <div>
                   <h2 style={{ fontFamily: 'var(--font-display)', color: '#000000', fontSize: '1.75rem', fontWeight: 800 }}>JNSIX ISP</h2>
                   <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>Red de Fibra Óptica FTTH</span>
@@ -628,7 +664,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
               </div>
 
               {/* Client & Billing info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.82rem', borderBottom: '1px solid #dddddd', paddingBottom: '1rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.82rem', borderBottom: '1px solid #dddddd', paddingBottom: '1rem' }}>
                 <div>
                   <strong style={{ display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase', color: '#555555', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Cliente / Abonado</strong>
                   <span style={{ fontSize: '0.95rem', fontWeight: 700, display: 'block' }}>{previewInvoice.client.fullName}</span>
@@ -664,7 +700,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
               </div>
 
               {/* Summary and Payment instructions */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', borderTop: '2px solid #000000', paddingTop: '1rem', fontSize: '0.8rem' }}>
+              <div className="grid invoice-grid" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', borderTop: '2px solid #000000', paddingTop: '1rem', fontSize: '0.8rem' }}>
                 <div>
                   <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#555555' }}>Instrucciones de Pago:</strong>
                   <span>Realizar transferencia bancaria al CBU: <strong>0000003100012345678901</strong></span><br />

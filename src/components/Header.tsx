@@ -57,7 +57,15 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
             <User size={14} color="var(--text-muted)" />
           </div>
           <div>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#ffffff' }}>
+            <div style={{ 
+              fontSize: '0.85rem', 
+              fontWeight: 600, 
+              color: '#ffffff',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: 'clamp(100px, 15vw, 200px)'
+            }}>
               {userName}
             </div>
           </div>
