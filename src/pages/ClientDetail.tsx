@@ -769,7 +769,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <MapPin size={18} color="var(--accent)" /> Ubicación Geográfica
             </h3>
-            {client.latitude && client.longitude ? (
+            {client.latitude && client.longitude && !isNaN(Number(client.latitude)) && !isNaN(Number(client.longitude)) ? (
               <div className="map-container" style={{ flex: 1, minHeight: '300px', position: 'relative' }}>
                 <Map
                   center={[Number(client.longitude), Number(client.latitude)]}

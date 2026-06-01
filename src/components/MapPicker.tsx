@@ -40,11 +40,14 @@ const MapPicker: React.FC<MapPickerProps> = ({
   defaultCenter = [-65.4117, -24.7859], // Salta Capital fallback
   zoom = 13,
 }) => {
-  const currentLng = parseFloat(lng as string) || defaultCenter[0];
-  const currentLat = parseFloat(lat as string) || defaultCenter[1];
+  const parsedLng = parseFloat(lng as string);
+  const parsedLat = parseFloat(lat as string);
 
-  const initialCoords: [number, number] = (lat && lng) 
-    ? [parseFloat(lng as string), parseFloat(lat as string)] 
+  const currentLng = !isNaN(parsedLng) ? parsedLng : defaultCenter[0];
+  const currentLat = !isNaN(parsedLat) ? parsedLat : defaultCenter[1];
+
+  const initialCoords: [number, number] = (!isNaN(parsedLng) && !isNaN(parsedLat))
+    ? [parsedLng, parsedLat]
     : defaultCenter;
 
   return (

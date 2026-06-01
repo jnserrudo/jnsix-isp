@@ -75,6 +75,21 @@ export const Map: React.FC<MapProps> = ({ center, zoom, className, children }) =
     };
   }, []);
 
+  // Resize observer to handle container size changes dynamically (e.g. flex resizing, modals opening, tab switching)
+  useEffect(() => {
+    if (!map || !containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [map]);
+
   // Update center if it changes externally
   useEffect(() => {
     if (map && isLoaded) {
@@ -83,7 +98,17 @@ export const Map: React.FC<MapProps> = ({ center, zoom, className, children }) =
   }, [center[0], center[1], map, isLoaded]);
 
   return (
-    <div ref={containerRef} className={className} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div 
+      ref={containerRef} 
+      className={className} 
+      style={{ 
+        position: 'absolute', 
+        top: 0, 
+        left: 0, 
+        width: '100%', 
+        height: '100%' 
+      }}
+    >
       {map && (
         <MapContext.Provider value={{ map, isLoaded }}>
           {children}
