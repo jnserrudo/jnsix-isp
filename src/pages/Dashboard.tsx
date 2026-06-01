@@ -1,0 +1,413 @@
+import React, { useEffect, useState } from 'react';
+import { 
+  Users, 
+  WifiOff, 
+  TrendingUp, 
+  AlertCircle, 
+  RefreshCw,
+  Play,
+  X
+} from 'lucide-react';
+import { showToast } from '../utils/toast';
+
+interface DashboardStats {
+  clients: {
+    total: number;
+    active: number;
+    suspended: number;
+    delinquent: number;
+  };
+  billingMonth: {
+    invoiced: number;
+    collected: number;
+    pending: number;
+  };
+  overdue: {
+    count: number;
+    amount: number;
+  };
+  recentActions: Array<{
+    id: string;
+    clientName: string;
+    nodeName: string;
+    actionType: string;
+    status: string;
+    executedAt: string;
+    errorMessage: string | null;
+  }>;
+  nodesCount: number;
+}
+
+interface DashboardProps {
+  token: string;
+  userRole: string;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'billing' | 'cuts' | null;
+    message: string;
+  }>({ type: null, message: '' });
+
+  const fetchStats = async () => {
+    try {
+      setError('');
+      const response = await fetch('/api/dashboard/stats', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al cargar estadísticas');
+      const data = await response.ok ? await response.json() : null;
+      setStats(data);
+    } catch (err: any) {
+      setError(err.message || 'Error cargando datos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, [token]);
+
+  const triggerBilling = () => {
+    setConfirmAction({
+      type: 'billing',
+      message: '¿Está seguro de forzar la generación de facturas mensuales hoy?'
+    });
+  };
+
+  const triggerCuts = () => {
+    setConfirmAction({
+      type: 'cuts',
+      message: '¿Está seguro de iniciar el proceso de corte automático en MikroTik para los morosos?'
+    });
+  };
+
+  const runBillingAction = async () => {
+    setActionLoading('billing');
+    setActionMessage('');
+    showToast('Generando facturas del mes...', 'info');
+    try {
+      const response = await fetch('/api/invoices/trigger-billing', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al gatillar facturación');
+      setActionMessage(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`);
+      showToast(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`, 'success');
+      fetchStats();
+    } catch (err: any) {
+      const errMsg = err.message || 'Fallo de facturación manual';
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const runCutsAction = async () => {
+    setActionLoading('cuts');
+    setActionMessage('');
+    showToast('Ejecutando cortes en MikroTik...', 'info');
+    try {
+      const response = await fetch('/api/invoices/trigger-cuts', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al ejecutar cortes');
+      setActionMessage(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`);
+      showToast(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`, 'success');
+      fetchStats();
+    } catch (err: any) {
+      const errMsg = err.message || 'Fallo de cortes manual';
+      setError(errMsg);
+      showToast(errMsg, 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+        <div style={{ color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <RefreshCw className="animate-spin" style={{ animation: 'spin 1.5s linear infinite' }} />
+          Cargando Panel de Control...
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="page-container">
+        <div style={{ backgroundColor: 'var(--color-danger-bg)', padding: '1rem', borderRadius: '8px', color: 'var(--color-danger)' }}>
+          Error: {error || 'No se pudieron recuperar las estadísticas.'}
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate percentage of collection
+  const collectedPct = stats.billingMonth.invoiced > 0 
+    ? Math.round((stats.billingMonth.collected / stats.billingMonth.invoiced) * 100)
+    : 0;
+
+  return (
+    <div className="page-container">
+      {/* Title block */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Panel de Control</h2>
+          <span style={{ color: 'var(--text-muted)' }}>Métricas e infraestructura en tiempo real</span>
+        </div>
+        <button className="btn btn-secondary" onClick={fetchStats} disabled={loading}>
+          <RefreshCw size={16} />
+          Actualizar
+        </button>
+      </div>
+
+      {/* Educational description box */}
+      <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Información del Sistema</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          Este panel consolida el estado de la red y las finanzas. 
+          Las facturas del mes se generan de manera automática todos los días a las 00:05 hs para los contratos programados para el día actual. 
+          Los cortes automatizados por falta de pago se procesan diariamente a las 09:00 hs para aquellos clientes cuya fecha de vencimiento y días de gracia hayan expirado.
+        </p>
+      </div>
+
+      {actionMessage && (
+        <div style={{
+          backgroundColor: 'var(--color-success-bg)',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          color: 'var(--color-success)',
+          padding: '0.75rem 1rem',
+          borderRadius: 'var(--radius-sm)',
+          marginBottom: '1.5rem',
+          fontWeight: 500
+        }}>
+          {actionMessage}
+        </div>
+      )}
+
+      {/* Admin Quick Action Run Triggers */}
+      {userRole === 'ADMIN' && (
+        <div className="card" style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Acciones de Administrador</h3>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={triggerBilling}
+              disabled={actionLoading !== null}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Play size={16} />
+              {actionLoading === 'billing' ? 'Ejecutando...' : 'Generar Facturas del Mes'}
+            </button>
+            <button 
+              className="btn btn-danger" 
+              onClick={triggerCuts}
+              disabled={actionLoading !== null}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <WifiOff size={16} />
+              {actionLoading === 'cuts' ? 'Ejecutando...' : 'Ejecutar Cortes Automáticos'}
+            </button>
+          </div>
+          
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '250px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Facturación Mensual</span>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                Genera facturas para contratos activos cuyo Día de Cobro coincide con el día del mes actual (ej: si hoy es 31, busca contratos con día de cobro 31).
+              </p>
+            </div>
+            <div style={{ flex: 1, minWidth: '250px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Motor de Cortes</span>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                Suspende en MikroTik a los abonados con facturas vencidas fuera de plazo (Fecha Vencimiento + Días de Gracia del Contrato menor al día de hoy).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-4" style={{ marginBottom: '2rem' }}>
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)' }}>
+            <Users size={28} color="var(--accent)" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Activos</span>
+            <h4 className="kpi-value">{stats.clients.active}</h4>
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ border: '1px solid var(--color-danger-border)', padding: '0.75rem', backgroundColor: 'var(--color-danger-bg)' }}>
+            <WifiOff size={28} color="var(--color-danger)" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Suspendidos</span>
+            <h4 className="kpi-value" style={{ color: 'var(--color-danger)' }}>{stats.clients.suspended}</h4>
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)' }}>
+            <TrendingUp size={28} color="var(--accent)" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nodos MikroTik</span>
+            <h4 className="kpi-value">{stats.nodesCount}</h4>
+          </div>
+        </div>
+
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)' }}>
+            <AlertCircle size={28} color="var(--color-warning)" />
+          </div>
+          <div>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Deuda Morosa</span>
+            <h4 className="kpi-value" style={{ color: 'var(--color-warning)' }}>
+              ${stats.overdue.amount.toLocaleString('es-AR')}
+            </h4>
+          </div>
+        </div>
+      </div>
+
+      {/* Invoicing Progress Section */}
+      <div className="grid grid-cols-2" style={{ marginBottom: '2rem' }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Recaudación Mensual</h3>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Progreso de Cobranza ({collectedPct}%)</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+              ${stats.billingMonth.collected.toLocaleString('es-AR')} / ${stats.billingMonth.invoiced.toLocaleString('es-AR')}
+            </span>
+          </div>
+          
+          {/* Progress Bar */}
+          <div style={{ width: '100%', height: '10px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '5px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+            <div style={{ width: `${collectedPct}%`, height: '100%', backgroundColor: 'var(--accent)', borderRadius: '5px', transition: 'width 0.5s ease' }} />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Por Cobrar</span>
+              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-warning)' }}>
+                ${stats.billingMonth.pending.toLocaleString('es-AR')}
+              </p>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Facturas Vencidas</span>
+              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-danger)' }}>
+                {stats.overdue.count}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Actions Logs */}
+        <div className="card">
+          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Últimas acciones MikroTik</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+            {stats.recentActions.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
+                No hay acciones registradas en el router.
+              </div>
+            ) : (
+              stats.recentActions.map((action) => (
+                <div 
+                  key={action.id} 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.75rem',
+                    backgroundColor: 'var(--bg-tertiary)',
+                    borderRadius: 'var(--radius-sm)',
+                    borderLeft: action.status === 'SUCCESS' 
+                      ? '3px solid var(--color-success)' 
+                      : '3px solid var(--color-danger)'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                      {action.clientName}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      Nodo: {action.nodeName} • {new Date(action.executedAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                    <span className={`badge ${action.actionType === 'BLOCK' ? 'badge-suspended' : 'badge-active'}`}>
+                      {action.actionType === 'BLOCK' ? 'Corte' : 'Reactivación'}
+                    </span>
+                    {action.status === 'FAILED' && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
+                        Fallo
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Confirmation Modal */}
+      {confirmAction.type && (
+        <div className="modal-backdrop" onClick={() => setConfirmAction({ type: null, message: '' })}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setConfirmAction({ type: null, message: '' })} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>Confirmar Acción</h3>
+            <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+              {confirmAction.message}
+            </p>
+             <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmAction({ type: null, message: '' })}>Cancelar</button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={() => {
+                  const type = confirmAction.type;
+                  setConfirmAction({ type: null, message: '' });
+                  if (type === 'billing') {
+                    runBillingAction();
+                  } else if (type === 'cuts') {
+                    runCutsAction();
+                  }
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Dashboard;

@@ -1,0 +1,730 @@
+import React, { useEffect, useState } from 'react';
+import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare } from 'lucide-react';
+import { showToast } from '../utils/toast';
+
+interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  amount: number;
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  dueDate: string;
+  issuedAt: string;
+  client: {
+    id: string;
+    fullName: string;
+    dni: string;
+  };
+  contract: {
+    graceDays: number;
+    plan: {
+      name: string;
+    };
+  };
+}
+
+interface BillingProps {
+  token: string;
+  userRole: string;
+}
+
+const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // WhatsApp Template Modal State
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [waInvoice, setWaInvoice] = useState<Invoice | null>(null);
+  const [waPhone, setWaPhone] = useState('');
+  const [waMessage, setWaMessage] = useState('');
+
+  // Invoice Print Preview Modal State
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
+
+  const handleOpenWhatsAppModal = (invoice: Invoice) => {
+    setWaInvoice(invoice);
+    setWaPhone('');
+    
+    const dueDateStr = new Date(invoice.dueDate).toLocaleDateString();
+    const amountStr = Number(invoice.amount).toLocaleString();
+    const graceDays = invoice.contract?.graceDays || 0;
+    const graceLimitDate = new Date(invoice.dueDate);
+    graceLimitDate.setDate(graceLimitDate.getDate() + graceDays);
+    const limitDateStr = graceLimitDate.toLocaleDateString();
+
+    let msg = '';
+    if (invoice.status === 'PAID') {
+      msg = `Estimado/a ${invoice.client.fullName}, le agradecemos el pago de su factura ${invoice.invoiceNumber} por un monto de $${amountStr} ARS. Su servicio se encuentra activo y al día. ¡Muchas gracias por elegirnos!`;
+    } else {
+      msg = `Estimado/a ${invoice.client.fullName}, le recordamos que su factura ${invoice.invoiceNumber} por un monto de $${amountStr} ARS venció el ${dueDateStr}.`;
+      if (new Date() > graceLimitDate) {
+        msg += ` Su tolerancia de pago expiró el ${limitDateStr} y el servicio se encuentra apto para suspensión automática.`;
+      } else {
+        msg += ` Cuenta con plazo de tolerancia de pago hasta el ${limitDateStr} para evitar la suspensión.`;
+      }
+      msg += ` Puede abonar mediante transferencia al CBU: 0000003100012345678901 (Banco JNSIX) y enviar su comprobante. ¡Muchas gracias!`;
+    }
+    
+    setWaMessage(msg);
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!waPhone) {
+      showToast('Por favor ingrese un número de teléfono', 'error');
+      return;
+    }
+    const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}`;
+    window.open(url, '_blank');
+    setIsWhatsAppModalOpen(false);
+  };
+
+  const handleOpenInvoiceModal = (invoice: Invoice) => {
+    setPreviewInvoice(invoice);
+    setIsInvoiceModalOpen(true);
+  };
+
+  // Reset page when search or status filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      setActiveDropdown(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  // Register payment modal
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('TRANSFER');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchInvoices = async () => {
+    try {
+      setLoading(true);
+      let url = '/api/invoices';
+      if (statusFilter) {
+        url += `?status=${statusFilter}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al obtener facturas');
+      const data = await response.json();
+      setInvoices(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [token, statusFilter]);
+
+  const handleRegisterPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoice) return;
+
+    setSubmitting(true);
+    showToast('Registrando pago...', 'info');
+    try {
+      const response = await fetch('/api/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          invoiceId: selectedInvoice.id,
+          amount: parseFloat(payAmount),
+          paymentMethod: payMethod,
+          reference: payRef || null,
+          notes: payNotes || null
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Error registrando el pago');
+      }
+
+      showToast('Pago registrado con éxito', 'success');
+      setSelectedInvoice(null);
+      setPayAmount('');
+      setPayRef('');
+      setPayNotes('');
+      fetchInvoices();
+    } catch (err: any) {
+      const errMsg = err.message || 'Error al procesar el pago';
+      showToast(errMsg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleForceExpire = async (invoiceId: string) => {
+    showToast('Marcando factura como vencida...', 'info');
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/expire`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al vencer factura');
+      showToast('Factura vencida con éxito', 'success');
+      fetchInvoices();
+    } catch (err: any) {
+      showToast(err.message || 'Error al vencer factura', 'error');
+    }
+  };
+
+  const filteredInvoices = invoices.filter(inv => {
+    return inv.client.fullName.toLowerCase().includes(search.toLowerCase()) || 
+           inv.client.dni.includes(search) ||
+           inv.invoiceNumber.toLowerCase().includes(search.toLowerCase());
+  });
+
+  const totalItems = filteredInvoices.length;
+  const totalPages = Math.ceil(totalItems / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + rowsPerPage);
+
+  return (
+    <div className="page-container">
+      {/* Title */}
+      <div style={{ marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Facturación y Cobros</h2>
+        <span style={{ color: 'var(--text-muted)' }}>Historial general de emisión y cobranza</span>
+      </div>
+
+      {/* Educational description box */}
+      <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Registro de Facturación</h3>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+          Desde este panel puede consultar y filtrar el estado de todas las facturas emitidas por el sistema. 
+          Al registrar el cobro de una factura pendiente o vencida, el sistema asentará el ingreso y, 
+          si el abonado no posee más deudas de contratos suspendidos, se restablecerá el servicio de internet de forma automática en el router MikroTik correspondiente.
+        </p>
+      </div>
+
+      {/* Filter panel */}
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
+          <Search size={18} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <input 
+            type="text" 
+            placeholder="Buscar por cliente, DNI o N° factura..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ paddingLeft: '2.5rem' }}
+          />
+        </div>
+        <div style={{ width: '200px' }}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">Todas las facturas</option>
+            <option value="PENDING">Pendientes</option>
+            <option value="PAID">Pagadas</option>
+            <option value="OVERDUE">Vencidas</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando facturación...</div>
+      ) : filteredInvoices.length === 0 ? (
+        <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+          No se encontraron facturas emitidas.
+        </div>
+      ) : (
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>N° Factura</th>
+                <th>Cliente</th>
+                <th>Plan Contratado</th>
+                <th>Monto</th>
+                <th>F. Vencimiento</th>
+                <th>Estado</th>
+                {userRole !== 'READONLY' && <th style={{ textAlign: 'right' }}>Acciones</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedInvoices.map((inv) => (
+                <tr key={inv.id}>
+                  <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>{inv.invoiceNumber}</td>
+                  <td>{inv.client.fullName}</td>
+                  <td>{inv.contract.plan.name}</td>
+                  <td style={{ fontWeight: 700 }}>${Number(inv.amount).toLocaleString()} ARS</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Calendar size={14} color="var(--text-muted)" />
+                      <span>{new Date(inv.dueDate).toLocaleDateString()}</span>
+                    </div>
+                  </td>
+                  <td>
+                    {(() => {
+                      const graceLimitDate = new Date(inv.dueDate);
+                      graceLimitDate.setDate(graceLimitDate.getDate() + inv.contract.graceDays);
+                      const isGraceExpired = new Date() > graceLimitDate;
+
+                      if (inv.status === 'PAID') {
+                        return <span className="badge badge-active">Pagada</span>;
+                      }
+
+                      if (isGraceExpired) {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div>
+                              <span className="badge badge-suspended">Vencida</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--accent)', fontWeight: 600 }}>
+                              Tolerancia de pago vencida: {graceLimitDate.toLocaleDateString()}
+                            </span>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div>
+                              <span className="badge badge-delinquent">Pendiente</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--color-warning)', fontWeight: 600 }}>
+                              Tolerancia de pago: {graceLimitDate.toLocaleDateString()}
+                            </span>
+                          </div>
+                        );
+                      }
+                    })()}
+                  </td>
+                  {userRole !== 'READONLY' && (
+                    <td style={{ textAlign: 'right', position: 'relative' }}>
+                      <div style={{ display: 'inline-flex', position: 'relative' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm"
+                          style={{ padding: '0.4rem', minWidth: '32px' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveDropdown(activeDropdown === inv.id ? null : inv.id);
+                          }}
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                        {activeDropdown === inv.id && (
+                          <div 
+                            style={{
+                              position: 'absolute',
+                              right: 0,
+                              top: '100%',
+                              marginTop: '4px',
+                              backgroundColor: 'var(--bg-secondary)',
+                              border: '1px solid var(--border-color)',
+                              zIndex: 100,
+                              minWidth: '150px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              textAlign: 'left'
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '0.6rem 1rem',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-main)',
+                                fontSize: '0.85rem',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid var(--border-color)'
+                              }}
+                              onClick={() => {
+                                setActiveDropdown(null);
+                                handleOpenInvoiceModal(inv);
+                              }}
+                            >
+                              Ver Factura
+                            </button>
+                            <button
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '0.6rem 1rem',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--text-main)',
+                                fontSize: '0.85rem',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                borderBottom: inv.status !== 'PAID' ? '1px solid var(--border-color)' : 'none'
+                              }}
+                              onClick={() => {
+                                setActiveDropdown(null);
+                                handleOpenWhatsAppModal(inv);
+                              }}
+                            >
+                              Notificar WhatsApp
+                            </button>
+                            {inv.status !== 'PAID' && (
+                              <button
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '0.6rem 1rem',
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--text-main)',
+                                  fontSize: '0.85rem',
+                                  textAlign: 'left',
+                                  cursor: 'pointer',
+                                  borderBottom: inv.status === 'PENDING' ? '1px solid var(--border-color)' : 'none'
+                                }}
+                                onClick={() => {
+                                  setActiveDropdown(null);
+                                  setSelectedInvoice(inv);
+                                  setPayAmount(inv.amount.toString());
+                                }}
+                              >
+                                Registrar Cobro
+                              </button>
+                            )}
+                            {inv.status === 'PENDING' && (
+                              <button
+                                style={{
+                                  display: 'block',
+                                  width: '100%',
+                                  padding: '0.6rem 1rem',
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'var(--accent)',
+                                  fontSize: '0.85rem',
+                                  textAlign: 'left',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => {
+                                  setActiveDropdown(null);
+                                  handleForceExpire(inv.id);
+                                }}
+                              >
+                                Vencer
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination bar */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '1rem 1.5rem', 
+            borderTop: '1px solid var(--border-color)', 
+            backgroundColor: 'var(--bg-secondary)',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span>Filas por página:</span>
+              <select 
+                value={rowsPerPage} 
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                style={{ 
+                  padding: '0.2rem 0.5rem', 
+                  backgroundColor: 'var(--bg-tertiary)', 
+                  border: '1px solid var(--border-color)', 
+                  color: '#ffffff',
+                  fontSize: '0.8rem',
+                  width: 'auto'
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <span>Mostrando {totalItems === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalItems)} de {totalItems}</span>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  style={{ padding: '0.3rem 0.6rem' }}
+                >
+                  Anterior
+                </button>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                  style={{ padding: '0.3rem 0.6rem' }}
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Record Payment Modal */}
+      {selectedInvoice && (
+        <div className="modal-backdrop" onClick={() => setSelectedInvoice(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setSelectedInvoice(null)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Registrar Cobro Manual</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+              Registrando cobro para la factura <strong>{selectedInvoice.invoiceNumber}</strong> de <strong>{selectedInvoice.client.fullName}</strong>.
+            </p>
+
+            <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Monto Recibido ($ ARS) *</label>
+                  <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} required />
+                </div>
+
+                <div className="form-group">
+                  <label>Método de Pago *</label>
+                  <select value={payMethod} onChange={e => setPayMethod(e.target.value)} required>
+                    <option value="TRANSFER">Transferencia Bancaria / CBU</option>
+                    <option value="CASH">Efectivo</option>
+                    <option value="MERCADO_PAGO">Mercado Pago</option>
+                    <option value="OTHER">Otro</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Referencia / N° de Comprobante</label>
+                  <input type="text" placeholder="Ej: Transf. 981242" value={payRef} onChange={e => setPayRef(e.target.value)} />
+                </div>
+
+                <div className="form-group">
+                  <label>Notas de Cobro</label>
+                  <textarea rows={2} placeholder="Comentarios adicionales" value={payNotes} onChange={e => setPayNotes(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setSelectedInvoice(null)} disabled={submitting}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" /> Procesando...
+                    </>
+                  ) : 'Registrar Pago'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* WhatsApp Onboarding Template Modal */}
+      {isWhatsAppModalOpen && waInvoice && (
+        <div className="modal-backdrop" onClick={() => setIsWhatsAppModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setIsWhatsAppModalOpen(false)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Enviar Recordatorio por WhatsApp</h3>
+            
+            <div className="modal-body">
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                Revise y edite la plantilla de recordatorio y el número de contacto antes de abrir WhatsApp Web.
+              </p>
+              
+              <div className="form-group">
+                <label>Número de Destino (Formato Internacional)</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: 5491154567890" 
+                  value={waPhone} 
+                  onChange={e => setWaPhone(e.target.value)} 
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Mensaje Personalizado</label>
+                <textarea 
+                  rows={6} 
+                  value={waMessage} 
+                  onChange={e => setWaMessage(e.target.value)} 
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ backgroundColor: 'var(--bg-tertiary)', borderLeft: '3px solid var(--accent)', padding: '0.75rem 1rem', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '1rem' }}>
+                <strong>¿Cómo funciona?</strong> Al presionar "Enviar Mensaje", se abrirá una nueva pestaña redirigiendo a WhatsApp Web con el texto precargado para que el operador solo tenga que hacer clic en Enviar.
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsWhatsAppModalOpen(false)}>Cancelar</button>
+              <button type="button" className="btn btn-primary" onClick={handleSendWhatsApp}>
+                <MessageSquare size={14} /> Enviar Mensaje
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Digital Print Friendly Preview Modal */}
+      {isInvoiceModalOpen && previewInvoice && (
+        <div className="modal-backdrop" onClick={() => setIsInvoiceModalOpen(false)}>
+          <div className="modal-content" style={{ maxWidth: '750px', padding: '2rem' }} onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setIsInvoiceModalOpen(false)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            
+            <div className="modal-body" id="invoice-print-area-billing" style={{ backgroundColor: '#ffffff', color: '#000000', padding: '2.5rem', border: '1px solid #000000', borderRadius: '0', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Invoice Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #000000', paddingBottom: '1rem' }}>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-display)', color: '#000000', fontSize: '1.75rem', fontWeight: 800 }}>JNSIX ISP</h2>
+                  <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>Red de Fibra Óptica FTTH</span>
+                  <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>CABA, Argentina • CUIT: 30-74125896-9</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <h4 style={{ color: '#000000', fontSize: '1.1rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Factura Digital</h4>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block' }}>{previewInvoice.invoiceNumber}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>Fecha de Emisión: {new Date(previewInvoice.issuedAt).toLocaleDateString()}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#666666', display: 'block' }}>Vencimiento: {new Date(previewInvoice.dueDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              {/* Client & Billing info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', fontSize: '0.82rem', borderBottom: '1px solid #dddddd', paddingBottom: '1rem' }}>
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase', color: '#555555', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Cliente / Abonado</strong>
+                  <span style={{ fontSize: '0.95rem', fontWeight: 700, display: 'block' }}>{previewInvoice.client.fullName}</span>
+                  <span>DNI: {previewInvoice.client.dni}</span>
+                </div>
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase', color: '#555555', fontSize: '0.7rem', letterSpacing: '0.05em' }}>Detalles del Servicio</strong>
+                  <span>Plan de Internet: {previewInvoice.contract?.plan?.name || 'Abono de Internet'}</span><br />
+                  <span>Tecnología: FTTH (Fibra Óptica)</span>
+                </div>
+              </div>
+
+              {/* Itemized Table */}
+              <div style={{ flex: 1 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', color: '#000000' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #000000' }}>
+                      <th style={{ color: '#000000', backgroundColor: '#f5f5f5', fontSize: '0.72rem', padding: '0.5rem 1rem', fontWeight: 700 }}>Descripción del Concepto</th>
+                      <th style={{ color: '#000000', backgroundColor: '#f5f5f5', fontSize: '0.72rem', padding: '0.5rem 1rem', textAlign: 'right', fontWeight: 700 }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #eeeeee' }}>
+                      <td style={{ color: '#333333', padding: '1rem', fontSize: '0.85rem' }}>
+                        Abono Mensual de Internet de Banda Ancha - Período Facturado
+                      </td>
+                      <td style={{ color: '#000000', padding: '1rem', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                        ${Number(previewInvoice.amount).toLocaleString()} ARS
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Summary and Payment instructions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem', borderTop: '2px solid #000000', paddingTop: '1rem', fontSize: '0.8rem' }}>
+                <div>
+                  <strong style={{ display: 'block', marginBottom: '0.25rem', color: '#555555' }}>Instrucciones de Pago:</strong>
+                  <span>Realizar transferencia bancaria al CBU: <strong>0000003100012345678901</strong></span><br />
+                  <span>Alias CBU: <strong>jnsix.isp.transfer</strong> • Banco: JNSIX S.A.</span><br />
+                  <span style={{ fontSize: '0.72rem', color: '#666666', display: 'block', marginTop: '0.5rem' }}>
+                    * Envíe el comprobante de transferencia al soporte administrativo para acreditar su cobro y mantener el estado activo en MikroTik.
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>Subtotal:</span>
+                    <span>${Number(previewInvoice.amount).toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span>IVA (0% Exento):</span>
+                    <span>$0</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #000000', paddingTop: '0.25rem', fontSize: '1.05rem', fontWeight: 800 }}>
+                    <span>Total A Pagar:</span>
+                    <span>${Number(previewInvoice.amount).toLocaleString()} ARS</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsInvoiceModalOpen(false)}>Cerrar</button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                onClick={() => {
+                  const printContent = document.getElementById('invoice-print-area-billing')?.innerHTML;
+                  if (printContent) {
+                    const style = document.createElement('style');
+                    style.innerHTML = `
+                      @media print {
+                        body * { visibility: hidden; }
+                        #print-container, #print-container * { visibility: visible; }
+                        #print-container { position: absolute; left: 0; top: 0; width: 100%; }
+                      }
+                    `;
+                    document.head.appendChild(style);
+                    const container = document.createElement('div');
+                    container.id = 'print-container';
+                    container.innerHTML = printContent;
+                    document.body.appendChild(container);
+                    window.print();
+                    document.body.removeChild(container);
+                    document.head.removeChild(style);
+                  }
+                }}
+              >
+                <Printer size={14} /> Imprimir Recibo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Billing;
