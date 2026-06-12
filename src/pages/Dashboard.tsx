@@ -66,7 +66,10 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error al cargar estadísticas');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al cargar estadísticas');
+      }
       const data = await response.json();
       setStats(data);
     } catch (err: any) {
@@ -176,18 +179,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     );
   }
 
-  if (error || !stats) {
-    return (
-      <div className="page-container">
-        <div style={{ backgroundColor: 'var(--color-danger-bg)', padding: '1rem', borderRadius: '8px', color: 'var(--color-danger)' }}>
-          Error: {error || 'No se pudieron recuperar las estadísticas.'}
-        </div>
-      </div>
-    );
-  }
-
   // Calculate percentage of collection
-  const collectedPct = stats.billingMonth.invoiced > 0 
+  const collectedPct = stats?.billingMonth.invoiced && stats.billingMonth.invoiced > 0 
     ? Math.round((stats.billingMonth.collected / stats.billingMonth.invoiced) * 100)
     : 0;
 
@@ -241,189 +234,222 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
         </p>
       </div>
 
-      {actionMessage && (
-        <div style={{
-          backgroundColor: 'var(--color-success-bg)',
-          border: '1px solid rgba(16, 185, 129, 0.2)',
-          color: 'var(--color-success)',
-          padding: '0.75rem 1rem',
-          borderRadius: 'var(--radius-sm)',
-          marginBottom: '1.5rem',
-          fontWeight: 500
+      {error || !stats ? (
+        <div className="card" style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '3rem 2rem', 
+          textAlign: 'center', 
+          backgroundColor: 'var(--bg-secondary)', 
+          border: '1px solid var(--border-color)',
+          marginTop: '1.5rem'
         }}>
-          {actionMessage}
+          <AlertCircle size={48} style={{ color: 'var(--color-warning)', marginBottom: '1rem' }} />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem' }}>Conexión Demorada o Interrumpida</h3>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', maxWidth: '500px', lineHeight: '1.5', marginBottom: '1.5rem' }}>
+            {error && error.includes('Too many database connections') 
+              ? 'La base de datos está experimentando una alta demanda de conexiones en este momento. Esto suele normalizarse automáticamente en unos segundos.' 
+              : 'No pudimos conectar con el servidor para obtener las métricas actuales de la red. Por favor, verifica tu conexión o reintenta.'}
+          </p>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => fetchStats(selectedNodeId)} 
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '0px' }}
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Reintentar Conexión
+          </button>
         </div>
-      )}
-
-      {/* Admin Quick Action Run Triggers */}
-      {userRole === 'ADMIN' && (
-        <div className="card" style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Acciones de Administrador</h3>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-primary" 
-              onClick={triggerBilling}
-              disabled={actionLoading !== null}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <Play size={16} />
-              {actionLoading === 'billing' ? 'Ejecutando...' : 'Generar Facturas del Mes'}
-            </button>
-            <button 
-              className="btn btn-danger" 
-              onClick={triggerCuts}
-              disabled={actionLoading !== null}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <WifiOff size={16} />
-              {actionLoading === 'cuts' ? 'Ejecutando...' : 'Ejecutar Cortes Automáticos'}
-            </button>
-          </div>
-          
-          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Facturación Mensual</span>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
-                Genera facturas para contratos activos cuyo Día de Cobro coincide con el día del mes actual (ej: si hoy es 31, busca contratos con día de cobro 31).
-              </p>
+      ) : (
+        <>
+          {actionMessage && (
+            <div style={{
+              backgroundColor: 'var(--color-success-bg)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              color: 'var(--color-success)',
+              padding: '0.75rem 1rem',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: '1.5rem',
+              fontWeight: 500
+            }}>
+              {actionMessage}
             </div>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Motor de Cortes</span>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
-                Suspende en MikroTik a los abonados con facturas vencidas fuera de plazo (Fecha Vencimiento + Días de Gracia del Contrato menor al día de hoy).
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-4 kpi-grid" style={{ marginBottom: '2rem' }}>
-        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
-            <Users size={28} color="var(--accent)" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Activos</span>
-            <h4 className="kpi-value">{stats.clients.active}</h4>
-          </div>
-        </div>
-
-        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div className="icon-wrapper" style={{ border: '1px solid var(--color-danger-border)', padding: '0.75rem', backgroundColor: 'var(--color-danger-bg)', display: 'flex' }}>
-            <WifiOff size={28} color="var(--color-danger)" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Suspendidos</span>
-            <h4 className="kpi-value" style={{ color: 'var(--color-danger)' }}>{stats.clients.suspended}</h4>
-          </div>
-        </div>
-
-        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
-            <TrendingUp size={28} color="var(--accent)" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nodos MikroTik</span>
-            <h4 className="kpi-value">{stats.nodesCount}</h4>
-          </div>
-        </div>
-
-        <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div className="icon-wrapper" style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)', display: 'flex' }}>
-            <AlertCircle size={28} color="var(--color-warning)" />
-          </div>
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Deuda Morosa</span>
-            <h4 className="kpi-value" style={{ color: 'var(--color-warning)' }}>
-              ${stats.overdue.amount.toLocaleString('es-AR')}
-            </h4>
-          </div>
-        </div>
-      </div>
-
-      {/* Invoicing Progress Section */}
-      <div className="grid grid-cols-2" style={{ marginBottom: '2rem' }}>
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Recaudación Mensual</h3>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Progreso de Cobranza ({collectedPct}%)</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
-              ${stats.billingMonth.collected.toLocaleString('es-AR')} / ${stats.billingMonth.invoiced.toLocaleString('es-AR')}
-            </span>
-          </div>
-          
-          {/* Progress Bar */}
-          <div style={{ width: '100%', height: '10px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '5px', overflow: 'hidden', marginBottom: '1.5rem' }}>
-            <div style={{ width: `${collectedPct}%`, height: '100%', backgroundColor: 'var(--accent)', borderRadius: '5px', transition: 'width 0.5s ease' }} />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-            <div>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Por Cobrar</span>
-              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-warning)' }}>
-                ${stats.billingMonth.pending.toLocaleString('es-AR')}
-              </p>
-            </div>
-            <div>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Facturas Vencidas</span>
-              <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-danger)' }}>
-                {stats.overdue.count}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Actions Logs */}
-        <div className="card">
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Últimas acciones MikroTik</h3>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.5rem' }}>
-            {stats.recentActions.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
-                No hay acciones registradas en el router.
-              </div>
-            ) : (
-              stats.recentActions.map((action) => (
-                <div 
-                  key={action.id} 
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.75rem',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: 'var(--radius-sm)',
-                    borderLeft: action.status === 'SUCCESS' 
-                      ? '3px solid var(--color-success)' 
-                      : '3px solid var(--color-danger)'
-                  }}
+          {/* Admin Quick Action Run Triggers */}
+          {userRole === 'ADMIN' && (
+            <div className="card" style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Acciones de Administrador</h3>
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={triggerBilling}
+                  disabled={actionLoading !== null}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
-                  <div>
-                    <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>
-                      {action.clientName}
-                    </div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Nodo: {action.nodeName} • {new Date(action.executedAt).toLocaleString()}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
-                    <span className={`badge ${action.actionType === 'BLOCK' ? 'badge-suspended' : 'badge-active'}`}>
-                      {action.actionType === 'BLOCK' ? 'Corte' : 'Reactivación'}
-                    </span>
-                    {action.status === 'FAILED' && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
-                        Fallo
-                      </span>
-                    )}
-                  </div>
+                  <Play size={16} />
+                  {actionLoading === 'billing' ? 'Ejecutando...' : 'Generar Facturas del Mes'}
+                </button>
+                <button 
+                  className="btn btn-danger" 
+                  onClick={triggerCuts}
+                  disabled={actionLoading !== null}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
+                  <WifiOff size={16} />
+                  {actionLoading === 'cuts' ? 'Ejecutando...' : 'Ejecutar Cortes Automáticos'}
+                </button>
+              </div>
+              
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.25rem', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '250px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Facturación Mensual</span>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                    Genera facturas para contratos activos cuyo Día de Cobro coincide con el día del mes actual (ej: si hoy es 31, busca contratos con día de cobro 31).
+                  </p>
                 </div>
-              ))
-            )}
+                <div style={{ flex: 1, minWidth: '250px' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>Motor de Cortes</span>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                    Suspende en MikroTik a los abonados con facturas vencidas fuera de plazo (Fecha Vencimiento + Días de Gracia del Contrato menor al día de hoy).
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* KPI Cards Grid */}
+          <div className="grid grid-cols-4 kpi-grid" style={{ marginBottom: '2rem' }}>
+            <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
+                <Users size={28} color="var(--accent)" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Activos</span>
+                <h4 className="kpi-value">{stats.clients.active}</h4>
+              </div>
+            </div>
+
+            <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div className="icon-wrapper" style={{ border: '1px solid var(--color-danger-border)', padding: '0.75rem', backgroundColor: 'var(--color-danger-bg)', display: 'flex' }}>
+                <WifiOff size={28} color="var(--color-danger)" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Clientes Suspendidos</span>
+                <h4 className="kpi-value" style={{ color: 'var(--color-danger)' }}>{stats.clients.suspended}</h4>
+              </div>
+            </div>
+
+            <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
+                <TrendingUp size={28} color="var(--accent)" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nodos MikroTik</span>
+                <h4 className="kpi-value">{stats.nodesCount}</h4>
+              </div>
+            </div>
+
+            <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+              <div className="icon-wrapper" style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)', display: 'flex' }}>
+                <AlertCircle size={28} color="var(--color-warning)" />
+              </div>
+              <div>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Deuda Morosa</span>
+                <h4 className="kpi-value" style={{ color: 'var(--color-warning)' }}>
+                  ${stats.overdue.amount.toLocaleString('es-AR')}
+                </h4>
+              </div>
+            </div>
+          </div>
+
+          {/* Invoicing Progress Section */}
+          <div className="grid grid-cols-2" style={{ marginBottom: '2rem' }}>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Recaudación Mensual</h3>
+              
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Progreso de Cobranza ({collectedPct}%)</span>
+                <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                  ${stats.billingMonth.collected.toLocaleString('es-AR')} / ${stats.billingMonth.invoiced.toLocaleString('es-AR')}
+                </span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div style={{ width: '100%', height: '10px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '5px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+                <div style={{ width: `${collectedPct}%`, height: '100%', backgroundColor: 'var(--accent)', borderRadius: '5px', transition: 'width 0.5s ease' }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Por Cobrar</span>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-warning)' }}>
+                    ${stats.billingMonth.pending.toLocaleString('es-AR')}
+                  </p>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Facturas Vencidas</span>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-danger)' }}>
+                    {stats.overdue.count}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent Actions Logs */}
+            <div className="card">
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '1.25rem' }}>Últimas acciones MikroTik</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                {stats.recentActions.length === 0 ? (
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
+                    No hay acciones registradas en el router.
+                  </div>
+                ) : (
+                  stats.recentActions.map((action) => (
+                    <div 
+                      key={action.id} 
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.75rem',
+                        backgroundColor: 'var(--bg-tertiary)',
+                        borderRadius: 'var(--radius-sm)',
+                        borderLeft: action.status === 'SUCCESS' 
+                          ? '3px solid var(--color-success)' 
+                          : '3px solid var(--color-danger)'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.88rem', fontWeight: 600 }}>
+                          {action.clientName}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          Nodo: {action.nodeName} • {new Date(action.executedAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                        <span className={`badge ${action.actionType === 'BLOCK' ? 'badge-suspended' : 'badge-active'}`}>
+                          {action.actionType === 'BLOCK' ? 'Corte' : 'Reactivación'}
+                        </span>
+                        {action.status === 'FAILED' && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--color-danger)' }}>
+                            Fallo
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+            </div>
           </div>
         </div>
-      </div>
+      </>
+    )}
 
       {/* Custom Confirmation Modal */}
       {confirmAction.type && (

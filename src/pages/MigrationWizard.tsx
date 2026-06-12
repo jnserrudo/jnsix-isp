@@ -19,6 +19,9 @@ interface Node {
   name: string;
   mikrotikHost: string;
   isActive: boolean;
+  _count?: {
+    contracts: number;
+  };
 }
 
 interface DBPlan {
@@ -84,6 +87,11 @@ const MigrationWizard: React.FC = () => {
   const [execResult, setExecResult] = useState<any | null>(null);
   const [loadingProceed, setLoadingProceed] = useState(false);
 
+  // Cleanup state
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [cleanupSuccess, setCleanupSuccess] = useState('');
+  const [cleanupError, setCleanupError] = useState('');
+
   const normalizePlanStr = (val: string): string => {
     if (!val) return '';
     const match = val.trim().match(/^(\d+)\s*(mb|mbps|megas|m|mb\/s)?$/i);
@@ -138,6 +146,45 @@ const MigrationWizard: React.FC = () => {
       setNodeVerifyError(err.response?.data?.message || err.message || 'Tiempo de espera agotado al conectar al puerto API (8728).');
     } finally {
       setVerifyingNode(false);
+    }
+  };
+
+  const selectedNode = nodes.find(n => n.id === selectedNodeId);
+
+  const handleCleanupNode = async () => {
+    if (!selectedNodeId) return;
+    const nodeName = selectedNode?.name || 'este nodo';
+    
+    const confirmed = window.confirm(
+      `¿Está absolutamente seguro de borrar todos los clientes y contratos asociados a "${nodeName}" de la base de datos?\n\nEsta acción eliminará todos los abonados, contratos, facturas y pagos asociados a este nodo y no se puede deshacer.`
+    );
+    if (!confirmed) return;
+
+    setCleanupLoading(true);
+    setCleanupSuccess('');
+    setCleanupError('');
+    try {
+      const res = await axios.post(
+        `${API_URL}/api/migration/cleanup-node`,
+        { nodeId: selectedNodeId },
+        { headers: { Authorization: `Bearer ${getToken()}` } }
+      );
+      
+      if (res.data.success) {
+        setCleanupSuccess(res.data.message || 'Limpieza realizada con éxito.');
+        // Refresh nodes to get updated counts
+        const nodesRes = await axios.get(`${API_URL}/api/nodes`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        setNodes(nodesRes.data);
+        setNodeVerifySuccess(null);
+      } else {
+        setCleanupError(res.data.message || 'Error al realizar la limpieza.');
+      }
+    } catch (err: any) {
+      setCleanupError(err.response?.data?.message || err.message || 'Error al conectar con el servidor.');
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -462,6 +509,51 @@ const MigrationWizard: React.FC = () => {
                   <li>Asegura que las credenciales de usuario/contraseña guardadas para el nodo sean de grupo "full".</li>
                   <li>Revisa las reglas de firewall en `/ip firewall filter` que puedan bloquear la entrada al puerto TCP 8728.</li>
                 </ul>
+              </div>
+            </div>
+          )}
+
+          {selectedNode && selectedNode._count && selectedNode._count.contracts > 0 && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.75rem',
+              backgroundColor: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              padding: '1.25rem',
+              marginTop: '1.5rem',
+              borderRadius: 'var(--radius-sm)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-danger)', fontWeight: 'bold' }}>
+                <AlertTriangle size={18} />
+                <span>Advertencia: Clientes Existentes Detectados</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+                Este nodo tiene actualmente <strong>{selectedNode._count.contracts}</strong> clientes/contratos vinculados en el sistema. 
+                Si esto se debe a una migración previa incorrecta (como una migración errónea al nodo de laboratorio) y desea limpiar y remover por completo a todos estos abonados y sus facturas asociadas para reiniciar la migración, puede hacerlo utilizando el botón de limpieza a continuación.
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={handleCleanupNode}
+                  disabled={cleanupLoading}
+                  className="btn btn-danger"
+                  style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '0px' }}
+                >
+                  {cleanupLoading ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+                  {cleanupLoading ? 'Limpiando datos...' : 'Eliminar y Limpiar Clientes Migrados'}
+                </button>
+                {cleanupSuccess && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-success)', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                    {cleanupSuccess}
+                  </div>
+                )}
+                {cleanupError && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 'bold', marginTop: '0.25rem' }}>
+                    {cleanupError}
+                  </div>
+                )}
               </div>
             </div>
           )}
