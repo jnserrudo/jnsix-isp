@@ -54,14 +54,20 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     message: string;
   }>({ type: null, message: '' });
 
-  const fetchStats = async () => {
+  // Nodes list and selection state
+  const [nodes, setNodes] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string>('');
+
+  const fetchStats = async (nodeId?: string) => {
+    setLoading(true);
     try {
       setError('');
-      const response = await fetch('/api/dashboard/stats', {
+      const url = nodeId ? `/api/dashboard/stats?nodeId=${nodeId}` : '/api/dashboard/stats';
+      const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar estadísticas');
-      const data = await response.ok ? await response.json() : null;
+      const data = await response.json();
       setStats(data);
     } catch (err: any) {
       setError(err.message || 'Error cargando datos');
@@ -70,9 +76,28 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     }
   };
 
+  // Fetch nodes list on mount
   useEffect(() => {
-    fetchStats();
+    const fetchNodes = async () => {
+      try {
+        const res = await fetch('/api/nodes', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setNodes(data);
+        }
+      } catch (err) {
+        console.error('Error fetching nodes for dashboard selector:', err);
+      }
+    };
+    fetchNodes();
   }, [token]);
+
+  // Refetch stats when node selection changes
+  useEffect(() => {
+    fetchStats(selectedNodeId);
+  }, [token, selectedNodeId]);
 
   const triggerBilling = () => {
     setConfirmAction({
@@ -104,7 +129,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
       if (!response.ok) throw new Error(data.error || 'Error al gatillar facturación');
       setActionMessage(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`);
       showToast(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`, 'success');
-      fetchStats();
+      fetchStats(selectedNodeId);
     } catch (err: any) {
       const errMsg = err.message || 'Fallo de facturación manual';
       setError(errMsg);
@@ -130,7 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
       if (!response.ok) throw new Error(data.error || 'Error al ejecutar cortes');
       setActionMessage(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`);
       showToast(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`, 'success');
-      fetchStats();
+      fetchStats(selectedNodeId);
     } catch (err: any) {
       const errMsg = err.message || 'Fallo de cortes manual';
       setError(errMsg);
@@ -140,7 +165,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     }
   };
 
-  if (loading) {
+  if (loading && !stats) {
     return (
       <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
         <div style={{ color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -169,15 +194,41 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   return (
     <div className="page-container">
       {/* Title block */}
-      <div className="title-block">
+      <div className="title-block" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Panel de Control</h2>
           <span style={{ color: 'var(--text-muted)' }}>Métricas e infraestructura en tiempo real</span>
         </div>
-        <button className="btn btn-secondary" onClick={fetchStats} disabled={loading}>
-          <RefreshCw size={16} />
-          Actualizar
-        </button>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Node Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={{ margin: 0, textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por Nodo:</label>
+            <select
+              value={selectedNodeId}
+              onChange={(e) => setSelectedNodeId(e.target.value)}
+              disabled={loading}
+              style={{
+                width: '200px',
+                padding: '0.4rem 0.75rem',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+                borderRadius: '0px'
+              }}
+            >
+              <option value="">-- Todos los Nodos --</option>
+              {nodes.map(n => (
+                <option key={n.id} value={n.id}>{n.name}</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-secondary btn-sm" onClick={() => fetchStats(selectedNodeId)} disabled={loading} style={{ height: '38px', borderRadius: '0px' }}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Educational description box */}

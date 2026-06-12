@@ -59,6 +59,27 @@ interface Payment {
   reference: string | null;
 }
 
+const parseMigrationNotes = (notes: string | null) => {
+  if (!notes) return null;
+  const match = notes.match(/\[MIGRATION_METADATA\](.*?)\[MIGRATION_METADATA\]/);
+  if (match) {
+    try {
+      const data = JSON.parse(match[1]);
+      const cleanNotes = notes.replace(/\[MIGRATION_METADATA\].*?\[MIGRATION_METADATA\]/, '').trim();
+      return { data, cleanNotes };
+    } catch (e) {
+      console.error('Error parsing migration metadata:', e);
+    }
+  }
+  return null;
+};
+
+const getMetadataHeader = (notes: string | null): string => {
+  if (!notes) return '';
+  const match = notes.match(/^\[MIGRATION_METADATA\].*?\[MIGRATION_METADATA\]/);
+  return match ? match[0] : '';
+};
+
 interface ClientDetailData {
   id: string;
   fullName: string;
@@ -520,6 +541,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     setSubmitting(true);
     showToast('Actualizando cliente...', 'info');
     try {
+      const metaHeader = getMetadataHeader(client?.notes || '');
+      const finalNotes = metaHeader ? `${metaHeader}${editNotes}` : editNotes;
+
       const response = await fetch(`/api/clients/${id}`, {
         method: 'PUT',
         headers: {
@@ -536,7 +560,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
           latitude: latNum,
           longitude: lngNum,
           status: editStatus,
-          notes: editNotes || null
+          notes: finalNotes || null
         })
       });
 
@@ -678,7 +702,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                     setEditLatitude(client.latitude ? client.latitude.toString() : '');
                     setEditLongitude(client.longitude ? client.longitude.toString() : '');
                     setEditStatus(client.status);
-                    setEditNotes(client.notes || '');
+                    const migrationInfo = parseMigrationNotes(client.notes);
+                    setEditNotes(migrationInfo ? migrationInfo.cleanNotes : (client.notes || ''));
                     setIsEditModalOpen(true);
                   }}
                 >
@@ -721,14 +746,85 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
             <p style={{ fontWeight: 500 }}>{client.address}</p>
           </div>
 
-          {client.notes && (
-            <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid var(--accent)' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
-                Observaciones / Notas del campo:
-              </span>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>{client.notes}</p>
-            </div>
-          )}
+          {(() => {
+            const migrationInfo = parseMigrationNotes(client.notes);
+            const displayNotes = migrationInfo ? migrationInfo.cleanNotes : client.notes;
+            
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* 1. Normal client notes */}
+                {displayNotes && (
+                  <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '0px', borderLeft: '3px solid var(--accent)' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                      Observaciones / Notas del campo:
+                    </span>
+                    <p style={{ fontSize: '0.88rem', color: 'var(--text-main)', margin: 0 }}>{displayNotes}</p>
+                  </div>
+                )}
+                
+                {/* 2. Graphical Match History Card */}
+                {migrationInfo && (
+                  <div style={{ 
+                    padding: '1rem', 
+                    backgroundColor: 'var(--bg-secondary)', 
+                    border: '1px solid var(--border-color)', 
+                    borderLeft: migrationInfo.data.matched ? '3px solid var(--color-success)' : '3px solid var(--accent)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                    borderRadius: '0px'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Historial de Comparación de Migración (MikroTik Handshake)
+                    </span>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span className={`badge ${migrationInfo.data.matched ? 'badge-active' : 'badge-suspended'}`} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>
+                        {migrationInfo.data.matched 
+                          ? `Coincidencia Auto-Detectada (${migrationInfo.data.confidence}%)` 
+                          : 'Sin Coincidencia en MikroTik (0%)'
+                        }
+                      </span>
+                    </div>
+
+                    {migrationInfo.data.matched ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginTop: '0.25rem', fontSize: '0.82rem', fontFamily: 'monospace' }}>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Método de Red:</span>
+                          <div style={{ color: '#ffffff', fontWeight: 600 }}>{migrationInfo.data.type}</div>
+                        </div>
+                        <div>
+                          <span style={{ color: 'var(--text-muted)' }}>Identificador en Router:</span>
+                          <div style={{ color: '#ffffff', fontWeight: 600 }}>{migrationInfo.data.name}</div>
+                        </div>
+                        {migrationInfo.data.comment && (
+                          <div style={{ gridColumn: 'span 2' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>Comentario en Router:</span>
+                            <div style={{ color: 'var(--color-warning)', fontWeight: 600 }}>{migrationInfo.data.comment}</div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                        Este abonado fue migrado sin una vinculación automática inicial con colas simples o sesiones MikroTik activas. La configuración técnica (IP/MAC o usuario PPPoE) se asignó manualmente o se configuró desde cero.
+                      </p>
+                    )}
+
+                    <div style={{ 
+                      fontSize: '0.72rem', 
+                      color: 'var(--text-muted)', 
+                      borderTop: '1px solid var(--border-color)', 
+                      paddingTop: '0.5rem',
+                      marginTop: '0.25rem',
+                      lineHeight: 1.4
+                    }}>
+                      <strong>Nota de Auditoría:</strong> Los datos superiores indican la comparación inicial hecha al importar. Si el porcentaje era erróneo o "falso positivo", puedes reconfigurar las credenciales de red del contrato en la pestaña de Contratos.
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* MikroTik Manual Control Actions */}
           {userRole !== 'READONLY' && (

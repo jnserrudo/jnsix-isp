@@ -3,6 +3,19 @@ import { Link } from 'react-router-dom';
 import { Search, Plus, X, RefreshCw, MoreVertical } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import MapPicker from '../components/MapPicker';
+import TablePagination from '../components/mikrotik/TablePagination';
+
+interface Contract {
+  id: string;
+  pppoeUsername: string | null;
+  pppoePassword: string | null;
+  staticIp: string | null;
+  macAddress: string | null;
+  node: {
+    id: string;
+    name: string;
+  };
+}
 
 interface Client {
   id: string;
@@ -13,6 +26,7 @@ interface Client {
   status: 'ACTIVE' | 'SUSPENDED' | 'DELINQUENT' | 'CANCELLED';
   address: string;
   createdAt: string;
+  contracts?: Contract[];
 }
 
 interface ClientsProps {
@@ -176,7 +190,6 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   });
 
   const totalItems = filteredClients.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedClients = filteredClients.slice(startIndex, startIndex + rowsPerPage);
 
@@ -245,6 +258,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                 <th>Nombre Completo</th>
                 <th className="desktop-only">DNI / Identificación</th>
                 <th className="desktop-only">Contacto</th>
+                <th className="desktop-only">Conexión / Red</th>
                 <th>Estado</th>
                 <th className="desktop-only">Dirección</th>
                 <th style={{ textAlign: 'right' }}>Acciones</th>
@@ -258,11 +272,52 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                     <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.25rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                       DNI: {client.dni} <br />
                       Tel: {client.phone1 || 'Sin contacto'} <br />
-                      Dir: {client.address}
+                      Dir: {client.address} <br />
+                      {client.contracts && client.contracts.length > 0 ? (
+                        (() => {
+                          const contract = client.contracts[0];
+                          if (contract.pppoeUsername) {
+                            return <span style={{ color: 'var(--color-success)' }}>Red: PPPoE ({contract.pppoeUsername})</span>;
+                          } else if (contract.staticIp) {
+                            return <span style={{ color: 'var(--color-warning)' }}>Red: IP Fija ({contract.staticIp})</span>;
+                          }
+                          return <span>Red: Sin configurar</span>;
+                        })()
+                      ) : (
+                        <span>Red: Sin contrato</span>
+                      )}
                     </div>
                   </td>
                   <td className="desktop-only">{client.dni}</td>
                   <td className="desktop-only">{client.phone1 || client.email || 'Sin contacto'}</td>
+                  <td className="desktop-only" style={{ fontSize: '0.82rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                    {client.contracts && client.contracts.length > 0 ? (
+                      (() => {
+                        const contract = client.contracts[0];
+                        if (contract.pppoeUsername) {
+                          return (
+                            <div>
+                              <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>PPPoE: </span>
+                              <code>{contract.pppoeUsername}</code>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Nodo: {contract.node.name}</div>
+                            </div>
+                          );
+                        } else if (contract.staticIp) {
+                          return (
+                            <div>
+                              <span style={{ color: 'var(--color-warning)', fontWeight: 'bold' }}>IP Estática: </span>
+                              <code>{contract.staticIp}</code>
+                              {contract.macAddress && <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>MAC: {contract.macAddress}</div>}
+                            </div>
+                          );
+                        } else {
+                          return <span style={{ color: 'var(--text-muted)' }}>Sin configurar en router</span>;
+                        }
+                      })()
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>Sin contrato</span>
+                    )}
+                  </td>
                   <td>
                     <span className={`badge ${
                       client.status === 'ACTIVE' ? 'badge-active' :
@@ -274,7 +329,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                        client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
                     </span>
                   </td>
-                  <td className="desktop-only" style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td className="desktop-only" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {client.address}
                   </td>
                   <td style={{ textAlign: 'right', position: 'relative' }}>
@@ -350,63 +405,13 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             </tbody>
           </table>
 
-          {/* Pagination bar */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            padding: '1rem 1.5rem', 
-            borderTop: '1px solid var(--border-color)', 
-            backgroundColor: 'var(--bg-secondary)',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span>Filas por página:</span>
-              <select 
-                value={rowsPerPage} 
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                style={{ 
-                  padding: '0.2rem 0.5rem', 
-                  backgroundColor: 'var(--bg-tertiary)', 
-                  border: '1px solid var(--border-color)', 
-                  color: '#ffffff',
-                  fontSize: '0.8rem',
-                  width: 'auto'
-                }}
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span>Mostrando {totalItems === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalItems)} de {totalItems}</span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  style={{ padding: '0.3rem 0.6rem' }}
-                >
-                  Anterior
-                </button>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  style={{ padding: '0.3rem 0.6rem' }}
-                >
-                  Siguiente
-                </button>
-              </div>
-            </div>
-          </div>
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={totalItems}
+            itemsPerPage={rowsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setRowsPerPage}
+          />
         </div>
       )}
 

@@ -8,6 +8,10 @@ import Clients from './pages/Clients';
 import ClientDetail from './pages/ClientDetail';
 import Billing from './pages/Billing';
 import Nodes from './pages/Nodes';
+import MikrotikTest from './pages/MikrotikTest';
+import MikrotikManagementCenter from './pages/MikrotikManagementCenter';
+import MigrationWizard from './pages/MigrationWizard';
+import Plans from './pages/Plans';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -122,6 +126,22 @@ const App: React.FC = () => {
               <Route path="/clients/:id" element={<ClientDetail token={token} userRole={user.role} />} />
               <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
               <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
+              <Route path="/mikrotik-test" element={<MikrotikTest />} />
+              <Route path="/mikrotik-management" element={
+                user.role === 'ADMIN' || user.role === 'OPERATOR' ? (
+                  <MikrotikManagementCenter />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/migration-wizard" element={
+                user.role === 'ADMIN' ? (
+                  <MigrationWizard />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
+              <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

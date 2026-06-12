@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import TablePagination from '../components/mikrotik/TablePagination';
 
 interface Invoice {
   id: string;
@@ -201,7 +202,6 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   });
 
   const totalItems = filteredInvoices.length;
-  const totalPages = Math.ceil(totalItems / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + rowsPerPage);
 
@@ -474,63 +474,13 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
             </tbody>
           </table>
 
-          {/* Pagination bar */}
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center', 
-            padding: '1rem 1.5rem', 
-            borderTop: '1px solid var(--border-color)', 
-            backgroundColor: 'var(--bg-secondary)',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span>Filas por página:</span>
-              <select 
-                value={rowsPerPage} 
-                onChange={(e) => {
-                  setRowsPerPage(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                style={{ 
-                  padding: '0.2rem 0.5rem', 
-                  backgroundColor: 'var(--bg-tertiary)', 
-                  border: '1px solid var(--border-color)', 
-                  color: '#ffffff',
-                  fontSize: '0.8rem',
-                  width: 'auto'
-                }}
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-              </select>
-            </div>
-            
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <span>Mostrando {totalItems === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + rowsPerPage, totalItems)} de {totalItems}</span>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  style={{ padding: '0.3rem 0.6rem' }}
-                >
-                  Anterior
-                </button>
-                <button 
-                  className="btn btn-secondary btn-sm" 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  style={{ padding: '0.3rem 0.6rem' }}
-                >
-                  Siguiente
-                </button>
-              </div>
-            </div>
-          </div>
+          <TablePagination
+            currentPage={currentPage}
+            totalItems={totalItems}
+            itemsPerPage={rowsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={setRowsPerPage}
+          />
         </div>
       )}
 

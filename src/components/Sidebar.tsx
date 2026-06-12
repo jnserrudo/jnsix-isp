@@ -8,7 +8,11 @@ import {
   LogOut,
   Radio,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  TestTube,
+  Sliders,
+  Shuffle,
+  Layers
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,8 +30,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, userRole, isOpen, onClose, 
   const menuItems = [
     { path: '/', label: 'Panel Control', icon: LayoutDashboard, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
     { path: '/clients', label: 'Clientes', icon: Users, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
+    { path: '/plans', label: 'Planes de Internet', icon: Layers, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
     { path: '/billing', label: 'Facturación y Pagos', icon: CreditCard, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
     { path: '/nodes', label: 'Nodos / MikroTik', icon: Network, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
+    { path: '/mikrotik-management', label: 'Centro Gestión MikroTik', icon: Sliders, roles: ['ADMIN', 'OPERATOR'] },
+    { path: '/migration-wizard', label: 'Asistente de Migración', icon: Shuffle, roles: ['ADMIN'] },
+    { path: '/mikrotik-test', label: 'Pruebas MikroTik', icon: TestTube, roles: ['ADMIN', 'OPERATOR'] },
   ];
 
   const allowedItems = menuItems.filter(item => item.roles.includes(userRole));

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Radio, Check, X, RefreshCw } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import LiveConnectionsTable from '../components/LiveConnectionsTable';
+import TablePagination from '../components/mikrotik/TablePagination';
 
 interface Node {
   id: string;
@@ -25,7 +27,8 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   const [testStatus, setTestStatus] = useState<{ [nodeId: string]: 'testing' | 'online' | 'offline' | null }>({});
 
   // Tabs state
-  const [activeTab, setActiveTab] = useState<'nodes' | 'actions'>('nodes');
+  const [activeTab, setActiveTab] = useState<'nodes' | 'actions' | 'radar'>('nodes');
+  const [selectedNodeForRadar, setSelectedNodeForRadar] = useState<string | null>(null);
   const [actions, setActions] = useState<Array<{
     id: string;
     clientName: string;
@@ -192,7 +195,6 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
 
   // Pagination logic for actions/events
   const totalEvents = actions.length;
-  const totalPagesEvents = Math.ceil(totalEvents / evtRowsPerPage);
   const startIndexEvents = (evtCurrentPage - 1) * evtRowsPerPage;
   const paginatedEvents = actions.slice(startIndexEvents, startIndexEvents + evtRowsPerPage);
 
@@ -264,6 +266,23 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
           }}
         >
           Historial de Eventos
+        </button>
+        <button
+          onClick={() => setActiveTab('radar')}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: activeTab === 'radar' ? 'var(--bg-secondary)' : 'transparent',
+            border: '1px solid var(--border-color)',
+            borderBottom: activeTab === 'radar' ? '1px solid transparent' : '1px solid var(--border-color)',
+            color: activeTab === 'radar' ? '#ffffff' : 'var(--text-muted)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontSize: '0.85rem',
+            zIndex: activeTab === 'radar' ? 2 : 1,
+            marginBottom: '-1px'
+          }}
+        >
+          Radar de Dispositivos
         </button>
       </div>
 
@@ -349,7 +368,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             })}
           </div>
         )
-      ) : (
+      ) : activeTab === 'actions' ? (
         actionsLoading ? (
           <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando historial de eventos...</div>
         ) : actions.length === 0 ? (
@@ -438,67 +457,68 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
 
             {/* Event Log Pagination bar */}
             {totalEvents > 0 && (
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                padding: '1.25rem 1.5rem', 
-                marginTop: '1.25rem',
-                border: '1px solid var(--border-color)', 
-                backgroundColor: 'var(--bg-secondary)',
-                flexWrap: 'wrap',
-                gap: '1rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <span>Registros por página:</span>
-                  <select 
-                    value={evtRowsPerPage} 
-                    onChange={(e) => {
-                      setEvtRowsPerPage(Number(e.target.value));
-                      setEvtCurrentPage(1);
-                    }}
-                    style={{ 
-                      padding: '0.2rem 0.5rem', 
-                      backgroundColor: 'var(--bg-tertiary)', 
-                      border: '1px solid var(--border-color)', 
-                      color: '#ffffff',
-                      fontSize: '0.8rem',
-                      width: 'auto'
-                    }}
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                  </select>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <span>Mostrando {startIndexEvents + 1}-{Math.min(startIndexEvents + evtRowsPerPage, totalEvents)} de {totalEvents}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => setEvtCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={evtCurrentPage === 1}
-                      style={{ padding: '0.3rem 0.6rem' }}
-                    >
-                      Anterior
-                    </button>
-                    <button 
-                      className="btn btn-secondary btn-sm" 
-                      onClick={() => setEvtCurrentPage(prev => Math.min(prev + 1, totalPagesEvents))}
-                      disabled={evtCurrentPage === totalPagesEvents || totalPagesEvents === 0}
-                      style={{ padding: '0.3rem 0.6rem' }}
-                    >
-                      Siguiente
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <TablePagination
+                currentPage={evtCurrentPage}
+                totalItems={totalEvents}
+                itemsPerPage={evtRowsPerPage}
+                onPageChange={setEvtCurrentPage}
+                onItemsPerPageChange={setEvtRowsPerPage}
+              />
             )}
           </>
         )
-      )}
+      ) : activeTab === 'radar' ? (
+        <div>
+          {nodes.length === 0 ? (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+              No hay nodos registrados. Agregue un nodo para escanear dispositivos.
+            </div>
+          ) : !selectedNodeForRadar ? (
+            <div>
+              <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Radar de Dispositivos</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+                  Seleccione un nodo para escanear todos los dispositivos conectados en tiempo real. El sistema detecta automáticamente conexiones PPPoE, DHCP e IPs estáticas, independientemente de la subred configurada.
+                </p>
+              </div>
+              <div className="grid grid-cols-2">
+                {nodes.map((node) => (
+                  <div 
+                    key={node.id} 
+                    className="card" 
+                    style={{ cursor: 'pointer', transition: 'all 0.2s' }}
+                    onClick={() => setSelectedNodeForRadar(node.id)}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
+                      <div style={{ backgroundColor: 'var(--accent-glow)', padding: '0.4rem', borderRadius: '6px' }}>
+                        <Radio size={18} color="var(--accent)" />
+                      </div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{node.name}</h3>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      <div>IP: {node.mikrotikHost}:{node.mikrotikPort}</div>
+                      <div>Usuario: {node.mikrotikUser}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <button 
+                onClick={() => setSelectedNodeForRadar(null)}
+                className="btn btn-secondary"
+                style={{ marginBottom: '1.5rem' }}
+              >
+                ← Volver a Nodos
+              </button>
+              <LiveConnectionsTable nodeId={selectedNodeForRadar} />
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Creation Modal */}
       {isModalOpen && (
