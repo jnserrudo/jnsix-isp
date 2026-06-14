@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Save, Power, FileText, AlertTriangle, RefreshCw, Download, Check } from 'lucide-react';
+import { Save, Power, FileText, AlertTriangle, RefreshCw, Download } from 'lucide-react';
 import { showToast } from '../../utils/toast';
 import TablePagination from './TablePagination';
 

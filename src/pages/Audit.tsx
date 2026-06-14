@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Search, Filter, RefreshCw, Calendar, User, Activity, Database, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldCheck, Filter, RefreshCw, Calendar, User, Activity, Database, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { fetchWithRetry } from '../utils/apiFetch';
 import { showToast } from '../utils/toast';
 import TopProgressBar from '../components/TopProgressBar';
@@ -58,7 +58,7 @@ interface AuditProps {
   userRole: string;
 }
 
-const Audit: React.FC<AuditProps> = ({ token, userRole }) => {
+const Audit: React.FC<AuditProps> = ({ token }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

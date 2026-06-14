@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Network, RefreshCw, AlertTriangle, Monitor, Server } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Monitor, Server } from 'lucide-react';
 import { showToast } from '../../utils/toast';
 import SkeletonTable from '../SkeletonTable';
 import TablePagination from './TablePagination';
