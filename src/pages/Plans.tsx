@@ -279,7 +279,8 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
           No hay planes de internet registrados en el sistema.
         </div>
       ) : (
-        <div className="table-wrapper">
+        <div>
+        <div className="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -294,8 +295,8 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
             </thead>
             <tbody>
               {paginatedPlans.map((plan) => (
-                <tr key={plan.id}>
-                  <td style={{ fontWeight: 600 }}>
+                <tr key={plan.id} className="table-row-hover">
+                  <td data-label="Nombre del Plan" style={{ fontWeight: 600 }}>
                     <div>{plan.name}</div>
                     {plan.description && (
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', fontWeight: 'normal', marginTop: '0.15rem' }}>
@@ -303,20 +304,20 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
                       </span>
                     )}
                   </td>
-                  <td style={{ fontFamily: 'monospace' }}>
+                  <td data-label="Velocidad (B/S)" style={{ fontFamily: 'monospace' }}>
                     {plan.downloadSpeed} Mbps / {plan.uploadSpeed} Mbps
                   </td>
-                  <td style={{ fontWeight: 700, color: '#ffffff' }}>
+                  <td data-label="Precio Mensual" style={{ fontWeight: 700, color: '#ffffff' }}>
                     ${Number(plan.price).toLocaleString('es-AR', { minimumFractionDigits: 2 })} ARS
                   </td>
-                  <td>
+                  <td data-label="MikroTik Profile">
                     {plan.mikrotikProfile ? (
                       <code style={{ fontSize: '0.8rem', color: 'var(--accent)' }}>{plan.mikrotikProfile}</code>
                     ) : (
                       <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Default / Dinámico</span>
                     )}
                   </td>
-                  <td style={{ fontWeight: 600 }}>
+                  <td data-label="Abonados Activos" style={{ fontWeight: 600 }}>
                     <span style={{ color: (plan._count?.contracts || 0) > 0 ? 'var(--color-success)' : 'var(--text-muted)' }}>
                       {plan._count?.contracts || 0} clientes totales
                     </span>
@@ -328,12 +329,12 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
                       </div>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     <span className={`badge ${plan.isActive ? 'badge-active' : 'badge-suspended'}`}>
                       {plan.isActive ? 'Activo' : 'Inactivo'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td data-label="Acciones" style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
                       <button
                         title="Historial de Aumentos"
@@ -370,6 +371,59 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
               ))}
             </tbody>
           </table>
+
+        </div>
+        
+        {/* Mobile View */}
+        <div className="mobile-only mobile-card-list">
+          {paginatedPlans.map((plan) => (
+            <div key={plan.id} className="mobile-card-item">
+              <div className="mobile-card-header">
+                <div className="mobile-card-title">{plan.name}</div>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Velocidad</div>
+                  <div className="mobile-card-value">{plan.downloadSpeed} / {plan.uploadSpeed} Mbps</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Precio</div>
+                  <div className="mobile-card-value" style={{fontWeight: 'bold'}}>${Number(plan.price).toLocaleString()} ARS</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">MikroTik Profile</div>
+                  <div className="mobile-card-value" style={{fontFamily: 'monospace'}}>{plan.mikrotikProfile || 'default'}</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Abonados Activos</div>
+                  <div className="mobile-card-value">{plan._count?.contracts || 0}</div>
+                </div>
+              </div>
+              <div className="mobile-card-footer" style={{flexWrap: 'wrap'}}>
+                {userRole !== 'READONLY' && (
+                  <>
+                    <button 
+                      className="btn btn-secondary btn-sm" 
+                      style={{flex: '1 1 auto', textAlign: 'center'}}
+                      onClick={() => handleOpenEditModal(plan)}
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      className="btn btn-danger btn-sm" 
+                      style={{flex: '1 1 auto', textAlign: 'center', marginLeft: '0.5rem', opacity: (plan._count?.contracts || 0) > 0 ? 0.3 : 1}}
+                      disabled={(plan._count?.contracts || 0) > 0}
+                      onClick={() => setDeleteTarget(plan)}
+                    >
+                      Eliminar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
 
           <TablePagination
             currentPage={currentPage}

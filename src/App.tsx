@@ -12,6 +12,7 @@ import MikrotikTest from './pages/MikrotikTest';
 import MikrotikManagementCenter from './pages/MikrotikManagementCenter';
 import MigrationWizard from './pages/MigrationWizard';
 import Plans from './pages/Plans';
+import Audit from './pages/Audit';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -142,6 +143,13 @@ const App: React.FC = () => {
                 )
               } />
               <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
+              <Route path="/audit" element={
+                user.role === 'ADMIN' ? (
+                  <Audit token={token} userRole={user.role} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              } />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>

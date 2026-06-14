@@ -411,7 +411,8 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
           No se encontraron clientes registrados con los filtros aplicados.
         </div>
       ) : (
-        <div className="table-wrapper">
+        <div>
+        <div className="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -426,8 +427,8 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             </thead>
             <tbody>
               {paginatedClients.map((client) => (
-                <tr key={client.id}>
-                  <td style={{ fontWeight: 600 }}>
+                <tr key={client.id} className="table-row-hover">
+                  <td data-label="Nombre Completo" style={{ fontWeight: 600 }}>
                     <Link to={`/clients/${client.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', display: 'inline-block' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                         {client.fullName}
@@ -452,9 +453,9 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                       )}
                     </div>
                   </td>
-                  <td className="desktop-only">{client.dni}</td>
-                  <td className="desktop-only">{client.phone1 || client.email || 'Sin contacto'}</td>
-                  <td className="desktop-only" style={{ fontSize: '0.82rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
+                  <td data-label="DNI" className="desktop-only">{client.dni}</td>
+                  <td data-label="Contacto" className="desktop-only">{client.phone1 || client.email || 'Sin contacto'}</td>
+                  <td data-label="Conexión" className="desktop-only" style={{ fontSize: '0.82rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                     {client.contracts && client.contracts.length > 0 ? (
                       (() => {
                         const contract = client.contracts[0];
@@ -482,7 +483,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                       <span style={{ color: 'var(--text-muted)' }}>Sin contrato</span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     <span className={`badge ${
                       client.status === 'ACTIVE' ? 'badge-active' :
                       client.status === 'SUSPENDED' ? 'badge-suspended' :
@@ -493,10 +494,10 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                        client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
                     </span>
                   </td>
-                  <td className="desktop-only" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td data-label="Dirección" className="desktop-only" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {client.address}
                   </td>
-                  <td style={{ textAlign: 'right', position: 'relative' }}>
+                  <td data-label="Acciones" style={{ textAlign: 'right', position: 'relative' }}>
                     <div style={{ display: 'inline-flex', position: 'relative' }}>
                       <button 
                         className="btn btn-secondary btn-sm" 
@@ -615,6 +616,90 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
               ))}
             </tbody>
           </table>
+
+        </div>
+        
+        {/* Mobile View */}
+        <div className="mobile-only mobile-card-list">
+          {paginatedClients.map((client) => (
+            <div key={client.id} className="mobile-card-item">
+              <div className="mobile-card-header">
+                <div className="mobile-card-title">{client.fullName}</div>
+                <span className={`badge ${
+                  client.status === 'ACTIVE' ? 'badge-active' :
+                  client.status === 'SUSPENDED' ? 'badge-suspended' :
+                  client.status === 'DELINQUENT' ? 'badge-delinquent' : 'badge-cancelled'
+                }`}>
+                  {client.status === 'ACTIVE' ? 'Activo' :
+                   client.status === 'SUSPENDED' ? 'Suspendido' :
+                   client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
+                </span>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">DNI</div>
+                  <div className="mobile-card-value">{client.dni}</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Contacto</div>
+                  <div className="mobile-card-value">{client.phone1 || client.email || 'Sin contacto'}</div>
+                </div>
+                {client.contracts && client.contracts.length > 0 ? (
+                  <div className="mobile-card-row">
+                    <div className="mobile-card-label">Conexión</div>
+                    <div className="mobile-card-value" style={{textAlign: 'right'}}>
+                      {client.contracts[0].pppoeUsername ? (
+                        <>
+                          <div style={{color: 'var(--color-success)', fontWeight: 'bold'}}>PPPoE</div>
+                          <div>{client.contracts[0].pppoeUsername}</div>
+                        </>
+                      ) : client.contracts[0].staticIp ? (
+                        <>
+                          <div style={{color: 'var(--color-warning)', fontWeight: 'bold'}}>IP Estática</div>
+                          <div>{client.contracts[0].staticIp}</div>
+                        </>
+                      ) : (
+                        <div style={{color: 'var(--text-muted)'}}>Sin configurar</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mobile-card-row">
+                    <div className="mobile-card-label">Red</div>
+                    <div className="mobile-card-value" style={{color: 'var(--text-muted)'}}>Sin contrato</div>
+                  </div>
+                )}
+                {client.address && (
+                  <div className="mobile-card-row">
+                    <div className="mobile-card-label">Dirección</div>
+                    <div className="mobile-card-value">{client.address}</div>
+                  </div>
+                )}
+              </div>
+              <div className="mobile-card-footer" style={{flexWrap: 'wrap'}}>
+                {client.contracts && client.contracts.length > 0 && !client.contracts[0].pppoeUsername && !client.contracts[0].staticIp && (
+                  <button 
+                    className="btn btn-warning btn-sm" 
+                    style={{flex: '1 1 100%', textAlign: 'center', marginBottom: '0.5rem'}}
+                    onClick={() => setConfigTarget({
+                      id: client.id,
+                      name: client.fullName,
+                      contractId: client.contracts![0].id,
+                      nodeName: client.contracts![0].node.name 
+                    })}
+                  >
+                    Configurar en Router
+                  </button>
+                )}
+                <Link to={`/clients/${client.id}`} className="btn btn-secondary btn-sm" style={{flex: 1, textAlign: 'center'}}>Ver Ficha</Link>
+                {userRole !== 'READONLY' && (
+                  <Link to={`/clients/${client.id}?edit=true`} className="btn btn-primary btn-sm" style={{flex: 1, textAlign: 'center', marginLeft: '0.5rem'}}>Editar</Link>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
 
           <TablePagination
             currentPage={currentPage}

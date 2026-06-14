@@ -12,7 +12,8 @@ import {
   TestTube,
   Sliders,
   Shuffle,
-  Layers
+  Layers,
+  ShieldCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, userRole, isOpen, onClose, 
     { path: '/mikrotik-management', label: 'Centro Gestión MikroTik', icon: Sliders, roles: ['ADMIN', 'OPERATOR'] },
     { path: '/migration-wizard', label: 'Asistente de Migración', icon: Shuffle, roles: ['ADMIN'] },
     { path: '/mikrotik-test', label: 'Pruebas MikroTik', icon: TestTube, roles: ['ADMIN', 'OPERATOR'] },
+    { path: '/audit', label: 'Auditoría de Sistema', icon: ShieldCheck, roles: ['ADMIN'] },
   ];
 
   const allowedItems = menuItems.filter(item => item.roles.includes(userRole));

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Plus, UserCheck, UserX, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import SkeletonTable from './SkeletonTable';
+import TablePagination from './mikrotik/TablePagination';
 
 interface DeviceConnection {
   type: string;
@@ -30,6 +31,10 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('ALL');
   const [scannedAt, setScannedAt] = useState('');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Modal de asociación
   const [associateTarget, setAssociateTarget] = useState<DeviceConnection | null>(null);
@@ -155,6 +160,18 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
 
   const orphansCount = connections.filter(c => !c.isAssociated).length;
 
+  // Pagination logic
+  const totalItems = filteredConnections.length;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedConnections = filteredConnections.slice(startIndex, startIndex + itemsPerPage);
+
+  useEffect(() => {
+    const maxPage = Math.ceil(totalItems / itemsPerPage);
+    if (currentPage > maxPage && maxPage > 0) {
+      setCurrentPage(maxPage);
+    }
+  }, [totalItems, itemsPerPage, currentPage]);
+
   if (loading) {
     return (
       <div style={{ marginTop: '1rem' }}>
@@ -239,7 +256,7 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
         </div>
       ) : (
         <div className="table-wrapper">
-          <table>
+          <table className="mobile-card-list">
             <thead>
               <tr>
                 <th>Dispositivo</th>
@@ -251,15 +268,15 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
               </tr>
             </thead>
             <tbody>
-              {filteredConnections.map((conn, idx) => (
+              {paginatedConnections.map((conn, idx) => (
                 <tr key={`${conn.mac || conn.ip}-${idx}`}>
-                  <td>
+                  <td data-label="Dispositivo">
                     <div style={{ fontWeight: 600 }}>{conn.deviceName}</div>
                     <div className="mobile-only" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '0.2rem' }}>
                       {conn.ip} • {conn.type}
                     </div>
                   </td>
-                  <td>
+                  <td data-label="Estado en Sistema">
                     {conn.isAssociated ? (
                       <div>
                         <span className="badge badge-active" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
@@ -286,11 +303,11 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
                   <td style={{ textAlign: 'right' }}>
                     {!conn.isAssociated && (
                       <button 
-                        className="btn btn-sm btn-primary"
+                        className="btn btn-sm btn-primary w-full"
                         onClick={() => setAssociateTarget(conn)}
                       >
                         <Plus size={14} />
-                        <span className="desktop-only" style={{ marginLeft: '0.4rem' }}>Asociar</span>
+                        <span style={{ marginLeft: '0.4rem' }}>Asociar</span>
                       </button>
                     )}
                   </td>
@@ -298,6 +315,16 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
               ))}
             </tbody>
           </table>
+          
+          {totalItems > 0 && (
+            <TablePagination
+              currentPage={currentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+            />
+          )}
         </div>
       )}
 

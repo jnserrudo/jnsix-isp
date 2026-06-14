@@ -338,7 +338,8 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
           No se encontraron facturas emitidas.
         </div>
       ) : (
-        <div className="table-wrapper">
+        <div>
+        <div className="table-wrapper desktop-only">
           <table>
             <thead>
               <tr>
@@ -353,19 +354,19 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
             </thead>
             <tbody>
               {paginatedInvoices.map((inv) => (
-                <tr key={inv.id}>
-                  <td className="desktop-only" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                <tr key={inv.id} className="table-row-hover">
+                  <td data-label="Nº Factura" className="desktop-only" style={{ fontWeight: 600, fontFamily: 'monospace' }}>
                     {inv.invoiceNumber}
                   </td>
-                  <td>
+                  <td data-label="Cliente">
                     <div style={{ fontWeight: 600 }}>{inv.client.fullName}</div>
                     <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                       N°: {inv.invoiceNumber} <br />
                       Plan: {inv.contract.plan.name}
                     </div>
                   </td>
-                  <td className="desktop-only">{inv.contract.plan.name}</td>
-                  <td>
+                  <td data-label="Plan Contratado" className="desktop-only">{inv.contract.plan.name}</td>
+                  <td data-label="Monto">
                     <div style={{ fontWeight: 700 }}>${Number(inv.amount).toLocaleString()} ARS</div>
                     <div className="mobile-only" style={{ marginTop: '0.25rem' }}>
                       {(() => {
@@ -392,13 +393,13 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                       })()}
                     </div>
                   </td>
-                  <td className="desktop-only">
+                  <td data-label="F. Vencimiento" className="desktop-only">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Calendar size={14} color="var(--text-muted)" />
                       <span>{new Date(inv.dueDate).toLocaleDateString()}</span>
                     </div>
                   </td>
-                  <td className="desktop-only">
+                  <td data-label="Estado" className="desktop-only">
                     {(() => {
                       const graceLimitDate = new Date(inv.dueDate);
                       graceLimitDate.setDate(graceLimitDate.getDate() + inv.contract.graceDays);
@@ -434,7 +435,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                     })()}
                   </td>
                   {userRole !== 'READONLY' && (
-                    <td style={{ textAlign: 'right', position: 'relative' }}>
+                    <td data-label="Acciones" style={{ textAlign: 'right', position: 'relative' }}>
                       <div style={{ display: 'inline-flex', position: 'relative' }}>
                         <button 
                           className="btn btn-secondary btn-sm"
@@ -556,6 +557,74 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
               ))}
             </tbody>
           </table>
+
+        </div>
+        
+        {/* Mobile View */}
+        <div className="mobile-only mobile-card-list">
+          {paginatedInvoices.map((inv) => (
+            <div key={inv.id} className="mobile-card-item">
+              <div className="mobile-card-header">
+                <div className="mobile-card-title" style={{fontFamily: 'monospace'}}>{inv.invoiceNumber}</div>
+                <span className={`badge ${
+                  inv.status === 'PAID' ? 'badge-active' :
+                  inv.status === 'PENDING' ? 'badge-warning' :
+                  inv.status === 'OVERDUE' ? 'badge-delinquent' : 'badge-cancelled'
+                }`}>
+                  {inv.status === 'PAID' ? 'Pagada' :
+                   inv.status === 'PENDING' ? 'Pendiente' :
+                   inv.status === 'OVERDUE' ? 'Vencida' : 'Anulada'}
+                </span>
+              </div>
+              <div className="mobile-card-body">
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Cliente</div>
+                  <div className="mobile-card-value" style={{fontWeight: 600}}>{inv.client.fullName}</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Plan</div>
+                  <div className="mobile-card-value">{inv.contract?.plan?.name || 'N/A'}</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Monto</div>
+                  <div className="mobile-card-value" style={{fontWeight: 'bold'}}>${Number(inv.amount).toLocaleString()} ARS</div>
+                </div>
+                <div className="mobile-card-row">
+                  <div className="mobile-card-label">Vencimiento</div>
+                  <div className="mobile-card-value">{new Date(inv.dueDate).toLocaleDateString('es-AR')}</div>
+                </div>
+              </div>
+              <div className="mobile-card-footer" style={{flexWrap: 'wrap'}}>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  style={{flex: '1 1 auto', textAlign: 'center'}}
+                  onClick={() => window.open(`/api/invoices/${inv.id}/pdf`, '_blank')}
+                >
+                  Ver PDF
+                </button>
+                {userRole !== 'READONLY' && inv.status === 'PENDING' && (
+                  <button 
+                    className="btn btn-success btn-sm" 
+                    style={{flex: '1 1 auto', textAlign: 'center', marginLeft: '0.5rem'}}
+                    onClick={() => setSelectedInvoice(inv)}
+                  >
+                    Pagada
+                  </button>
+                )}
+                {userRole !== 'READONLY' && inv.status === 'PENDING' && (
+                  <button 
+                    className="btn btn-danger btn-sm" 
+                    style={{flex: '1 1 auto', textAlign: 'center', marginLeft: '0.5rem'}}
+                    onClick={() => handleForceExpire(inv.id)}
+                  >
+                    Vencer
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
 
           <TablePagination
             currentPage={currentPage}

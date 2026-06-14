@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Radio, Check, X, RefreshCw, AlertCircle } from 'lucide-react';
+import { Plus, Radio, Check, X, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import MikrotikDeviceScanner from '../components/MikrotikDeviceScanner';
+import MikrotikTopologyScanner from '../components/mikrotik/MikrotikTopologyScanner';
+import MikrotikDiagnosticTools from '../components/mikrotik/MikrotikDiagnosticTools';
+import MikrotikActiveSessions from '../components/mikrotik/MikrotikActiveSessions';
+import MikrotikSystemControl from '../components/mikrotik/MikrotikSystemControl';
 import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
@@ -31,8 +35,10 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   const [testStatus, setTestStatus] = useState<{ [nodeId: string]: 'testing' | 'online' | 'offline' | null }>({});
 
   // Tabs state
-  const [activeTab, setActiveTab] = useState<'nodes' | 'actions' | 'radar'>('nodes');
-  const [selectedNodeForRadar, setSelectedNodeForRadar] = useState<string | null>(null);
+  const [activeMainTab, setActiveMainTab] = useState<'nodes' | 'actions'>('nodes');
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [activeDetailTab, setActiveDetailTab] = useState<'radar' | 'topology' | 'ping' | 'sessions' | 'system' | 'history'>('radar');
+
   const [actions, setActions] = useState<Array<{
     id: string;
     clientName: string;
@@ -98,13 +104,14 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   };
 
   useEffect(() => {
-    if (activeTab === 'actions') {
+    if (activeMainTab === 'actions' || activeDetailTab === 'history') {
       fetchActions();
       setEvtCurrentPage(1);
-    } else {
+    } 
+    if (activeMainTab === 'nodes' && !selectedNode) {
       fetchNodes();
     }
-  }, [token, activeTab]);
+  }, [token, activeMainTab, activeDetailTab, selectedNode]);
 
   const handleCreateNode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,13 +220,124 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
     }
   }, [actions, evtRowsPerPage, evtCurrentPage]);
 
+  // View: Master or Detail
+  if (selectedNode) {
+    return (
+      <div className="page-container">
+        <TopProgressBar loading={loading} />
+        
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button 
+            onClick={() => setSelectedNode(null)}
+            className="btn btn-secondary"
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            <ArrowLeft size={16} />
+            Volver a Nodos
+          </button>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Radio size={20} color="var(--accent)" />
+              {selectedNode.name}
+            </h2>
+            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              {selectedNode.mikrotikHost}:{selectedNode.mikrotikPort}
+            </span>
+          </div>
+        </div>
+
+        {/* Detail Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '2.5rem', gap: '0px', overflowX: 'auto' }}>
+          {[
+            { id: 'radar', label: 'Radar de Dispositivos' },
+            { id: 'topology', label: 'Topología de Red' },
+            { id: 'ping', label: 'Diagnóstico (Ping)' },
+            { id: 'sessions', label: 'Equipos Conectados' },
+            { id: 'system', label: 'Mantenimiento Sistema' },
+            { id: 'history', label: 'Historial de Eventos' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveDetailTab(tab.id as any)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: activeDetailTab === tab.id ? 'var(--bg-secondary)' : 'transparent',
+                border: '1px solid var(--border-color)',
+                borderBottom: activeDetailTab === tab.id ? '1px solid transparent' : '1px solid var(--border-color)',
+                color: activeDetailTab === tab.id ? '#ffffff' : 'var(--text-muted)',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                zIndex: activeDetailTab === tab.id ? 2 : 1,
+                marginBottom: '-1px',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Detail Tab Content */}
+        {activeDetailTab === 'radar' && <MikrotikDeviceScanner nodeId={selectedNode.id} />}
+        {activeDetailTab === 'topology' && <MikrotikTopologyScanner nodeId={selectedNode.id} token={token} onImportNode={(ip, n) => { setHost(ip); setName(n); setIsModalOpen(true); }} />}
+        {activeDetailTab === 'ping' && <MikrotikDiagnosticTools nodeId={selectedNode.id} token={token} />}
+        {activeDetailTab === 'sessions' && <MikrotikActiveSessions nodeId={selectedNode.id} token={token} />}
+        {activeDetailTab === 'system' && <MikrotikSystemControl nodeId={selectedNode.id} token={token} />}
+        {activeDetailTab === 'history' && (
+          <div className="card">
+            <h3 style={{ marginBottom: '1.5rem', fontWeight: 700, fontSize: '1.1rem' }}>Historial de Eventos del Router</h3>
+            {actionsLoading ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>Cargando eventos...</div>
+            ) : actions.filter(a => a.nodeName === selectedNode.name).length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: '#555' }}>No hay eventos recientes para este nodo.</div>
+            ) : (
+              <div className="event-log-container">
+                {actions.filter(a => a.nodeName === selectedNode.name).slice(0, 15).map((act) => {
+                  const isSuccess = act.status === 'SUCCESS';
+                  const isFailed = act.status === 'FAILED';
+                  return (
+                    <div key={act.id} className={`event-log-card ${isSuccess ? 'success' : isFailed ? 'failed' : 'pending'}`}>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>{new Date(act.executedAt).toLocaleTimeString()}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(act.executedAt).toLocaleDateString()}</span>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>Abonado</span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 700 }}>{act.clientName}</span>
+                      </div>
+                      <div>
+                        <span className={`badge ${act.actionType === 'BLOCK' ? 'badge-suspended' : 'badge-active'}`} style={{ display: 'inline-block', marginBottom: '0.2rem' }}>
+                          {act.actionType === 'BLOCK' ? 'Corte' : act.actionType === 'UNBLOCK' ? 'Reactivar' : act.actionType === 'SPEED_CHANGE' ? 'Velocidad' : 'Test'}
+                        </span>
+                        <div style={{ fontSize: '0.75rem', color: isSuccess ? 'var(--color-success)' : 'var(--accent)' }}>
+                          {isSuccess ? 'Exitoso' : 'Fallido'}
+                        </div>
+                      </div>
+                      <div style={{ paddingLeft: '0.5rem', borderLeft: '1px solid var(--border-color)', display: 'flex', alignItems: 'center' }}>
+                        <span className="event-system-log" style={{ color: isFailed ? 'var(--accent)' : 'var(--text-muted)' }}>
+                          {act.errorMessage || 'apiROS: command completed successfully'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // View: Master
   return (
     <div className="page-container">
       <TopProgressBar loading={loading || actionsLoading} />
       {/* Header */}
       <div className="title-block">
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Equipos MikroTik e Infraestructura</h2>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Infraestructura de Red</h2>
           <span style={{ color: 'var(--text-muted)' }}>Routers MikroTik core de distribución y OLTs de fibra</span>
         </div>
         {userRole === 'ADMIN' && (
@@ -230,72 +348,52 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         )}
       </div>
 
-      {/* Educational description box */}
       <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Administración de Equipos MikroTik</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-          Desde este panel puede dar de alta los equipos MikroTik (RB5009) y las OLTs de fibra (V-SOL GPON/EPON) que integran su red. 
-          Es requisito indispensable habilitar el servicio API en cada router (puertos por defecto 8728 u 8729) y proveer un usuario con permisos de lectura y escritura. 
-          Use el botón de "Test Conexión" para verificar en tiempo real que el backend de este panel logra comunicarse con el router de red.
+          Desde este panel puede dar de alta los equipos MikroTik. Seleccione un nodo de la lista para acceder a todas sus herramientas avanzadas de diagnóstico, control de sesiones y radar de red.
         </p>
       </div>
 
-      {/* Tab Navigation */}
+      {/* Main Tab Navigation */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '2.5rem', gap: '0px' }}>
         <button
-          onClick={() => setActiveTab('nodes')}
+          onClick={() => setActiveMainTab('nodes')}
           style={{
             padding: '0.75rem 1.5rem',
-            background: activeTab === 'nodes' ? 'var(--bg-secondary)' : 'transparent',
+            background: activeMainTab === 'nodes' ? 'var(--bg-secondary)' : 'transparent',
             border: '1px solid var(--border-color)',
-            borderBottom: activeTab === 'nodes' ? '1px solid transparent' : '1px solid var(--border-color)',
-            color: activeTab === 'nodes' ? '#ffffff' : 'var(--text-muted)',
+            borderBottom: activeMainTab === 'nodes' ? '1px solid transparent' : '1px solid var(--border-color)',
+            color: activeMainTab === 'nodes' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: 600,
             cursor: 'pointer',
             fontSize: '0.85rem',
-            zIndex: activeTab === 'nodes' ? 2 : 1,
+            zIndex: activeMainTab === 'nodes' ? 2 : 1,
             marginBottom: '-1px'
           }}
         >
           Equipos MikroTik
         </button>
         <button
-          onClick={() => setActiveTab('actions')}
+          onClick={() => setActiveMainTab('actions')}
           style={{
             padding: '0.75rem 1.5rem',
-            background: activeTab === 'actions' ? 'var(--bg-secondary)' : 'transparent',
+            background: activeMainTab === 'actions' ? 'var(--bg-secondary)' : 'transparent',
             border: '1px solid var(--border-color)',
-            borderBottom: activeTab === 'actions' ? '1px solid transparent' : '1px solid var(--border-color)',
-            color: activeTab === 'actions' ? '#ffffff' : 'var(--text-muted)',
+            borderBottom: activeMainTab === 'actions' ? '1px solid transparent' : '1px solid var(--border-color)',
+            color: activeMainTab === 'actions' ? '#ffffff' : 'var(--text-muted)',
             fontWeight: 600,
             cursor: 'pointer',
             fontSize: '0.85rem',
-            zIndex: activeTab === 'actions' ? 2 : 1,
+            zIndex: activeMainTab === 'actions' ? 2 : 1,
             marginBottom: '-1px'
           }}
         >
-          Historial de Eventos
-        </button>
-        <button
-          onClick={() => setActiveTab('radar')}
-          style={{
-            padding: '0.75rem 1.5rem',
-            background: activeTab === 'radar' ? 'var(--bg-secondary)' : 'transparent',
-            border: '1px solid var(--border-color)',
-            borderBottom: activeTab === 'radar' ? '1px solid transparent' : '1px solid var(--border-color)',
-            color: activeTab === 'radar' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            zIndex: activeTab === 'radar' ? 2 : 1,
-            marginBottom: '-1px'
-          }}
-        >
-          Radar de Dispositivos
+          Historial Global de Eventos
         </button>
       </div>
 
-      {activeTab === 'nodes' ? (
+      {activeMainTab === 'nodes' ? (
         loading ? (
           <SkeletonTable rows={4} columns={['30%', '20%', '20%', '15%', '15%']} />
         ) : error ? (
@@ -317,7 +415,11 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             {nodes.map((node) => {
               const status = testStatus[node.id];
               return (
-                <div key={node.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                <div key={node.id} className="card hoverable-card" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', cursor: 'pointer', transition: 'all 0.2s', border: '1px solid transparent' }}
+                  onClick={() => setSelectedNode(node)}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'rgba(56,189,248,0.3)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'transparent'; }}
+                >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                       <div style={{ backgroundColor: 'var(--accent-glow)', padding: '0.4rem', borderRadius: '6px' }}>
@@ -329,7 +431,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                       <button 
                         className="btn btn-danger btn-sm" 
                         style={{ padding: '0.3rem' }}
-                        onClick={() => setDeleteTarget({ id: node.id, name: node.name })}
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: node.id, name: node.name }); }}
                       >
                         Eliminar
                       </button>
@@ -373,13 +475,16 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                     </div>
                   </div>
 
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                     <button 
                       className="btn btn-secondary btn-sm"
-                      onClick={() => handleTestConnection(node.id)}
+                      onClick={(e) => { e.stopPropagation(); handleTestConnection(node.id); }}
                       disabled={status === 'testing'}
                     >
-                      Test Conexión Router
+                      Test API Router
+                    </button>
+                    <button className="btn btn-primary btn-sm" style={{ pointerEvents: 'none' }}>
+                      Administrar Nodo
                     </button>
                   </div>
                 </div>
@@ -387,7 +492,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             })}
           </div>
         )
-      ) : activeTab === 'actions' ? (
+      ) : activeMainTab === 'actions' ? (
         actionsLoading ? (
           <div className="page-loader" style={{ minHeight: '30vh' }}>
             <div className="ring-spinner" />
@@ -487,7 +592,6 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
               })}
             </div>
 
-            {/* Event Log Pagination bar */}
             {totalEvents > 0 && (
               <TablePagination
                 currentPage={evtCurrentPage}
@@ -499,57 +603,6 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             )}
           </>
         )
-      ) : activeTab === 'radar' ? (
-        <div>
-          {nodes.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-              No hay nodos registrados. Agregue un nodo para escanear dispositivos.
-            </div>
-          ) : !selectedNodeForRadar ? (
-            <div>
-              <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
-                <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Radar de Dispositivos</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  Seleccione un nodo para escanear todos los dispositivos conectados en tiempo real. El sistema detecta automáticamente conexiones PPPoE, DHCP e IPs estáticas, independientemente de la subred configurada.
-                </p>
-              </div>
-              <div className="grid grid-cols-2">
-                {nodes.map((node) => (
-                  <div 
-                    key={node.id} 
-                    className="card" 
-                    style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                    onClick={() => setSelectedNodeForRadar(node.id)}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.75rem' }}>
-                      <div style={{ backgroundColor: 'var(--accent-glow)', padding: '0.4rem', borderRadius: '6px' }}>
-                        <Radio size={18} color="var(--accent)" />
-                      </div>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{node.name}</h3>
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      <div>IP: {node.mikrotikHost}:{node.mikrotikPort}</div>
-                      <div>Usuario: {node.mikrotikUser}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div>
-              <button 
-                onClick={() => setSelectedNodeForRadar(null)}
-                className="btn btn-secondary"
-                style={{ marginBottom: '1.5rem' }}
-              >
-                ← Volver a Nodos
-              </button>
-              <MikrotikDeviceScanner nodeId={selectedNodeForRadar} />
-            </div>
-          )}
-        </div>
       ) : null}
 
       {/* Creation Modal */}
