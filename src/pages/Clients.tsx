@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, X, RefreshCw, MoreVertical } from 'lucide-react';
+import { Search, Plus, X, RefreshCw, MoreVertical, WifiOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { fetchWithRetry } from '../utils/apiFetch';
 import MapPicker from '../components/MapPicker';
 import TablePagination from '../components/mikrotik/TablePagination';
+import SkeletonTable from '../components/SkeletonTable';
+import TopProgressBar from '../components/TopProgressBar';
 
 interface Contract {
   id: string;
@@ -13,6 +16,9 @@ interface Contract {
   macAddress: string | null;
   node: {
     id: string;
+    name: string;
+  };
+  plan?: {
     name: string;
   };
 }
@@ -38,7 +44,11 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [nodeFilter, setNodeFilter] = useState('');
+  const [connectionFilter, setConnectionFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,6 +65,14 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  
+  // Config Router states
+  const [configTarget, setConfigTarget] = useState<{ id: string; name: string, contractId: string, nodeName: string } | null>(null);
+  const [configType, setConfigType] = useState<'PPPoE' | 'StaticIP'>('PPPoE');
+  const [configUsername, setConfigUsername] = useState('');
+  const [configPassword, setConfigPassword] = useState('');
+  const [configIp, setConfigIp] = useState('');
+  const [configSubmitting, setConfigSubmitting] = useState(false);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,7 +81,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, nodeFilter, connectionFilter, planFilter]);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -76,14 +94,15 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/clients', {
+      setError(null);
+      const response = await fetchWithRetry('/api/clients', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error al cargar la lista de clientes');
       const data = await response.json();
       setClients(data);
     } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Error de conexión');
     } finally {
       setLoading(false);
     }
@@ -118,7 +137,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
     setSubmitting(true);
     showToast('Guardando cliente...', 'info');
     try {
-      const response = await fetch('/api/clients', {
+      const response = await fetchWithRetry('/api/clients', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -165,7 +184,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const handleDeleteClient = async (id: string) => {
     showToast('Eliminando cliente...', 'info');
     try {
-      const response = await fetch(`/api/clients/${id}`, {
+      const response = await fetchWithRetry(`/api/clients/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -180,21 +199,95 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
     }
   };
 
+  const handleConfigureRouter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configTarget) return;
+
+    setConfigSubmitting(true);
+    try {
+      const payload: any = {};
+      if (configType === 'PPPoE') {
+        if (!configUsername || !configPassword) throw new Error('Complete usuario y contraseña PPPoE');
+        payload.pppoeUsername = configUsername;
+        payload.pppoePassword = configPassword;
+      } else {
+        if (!configIp) throw new Error('Complete la dirección IP Estática');
+        payload.staticIp = configIp;
+      }
+
+      const response = await fetchWithRetry(`/api/contracts/${configTarget.contractId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Error al configurar en router');
+      }
+
+      showToast('Configuración guardada y sincronizada con el router', 'success');
+      setConfigTarget(null);
+      // Reset form
+      setConfigUsername('');
+      setConfigPassword('');
+      setConfigIp('');
+      fetchClients();
+    } catch (err: any) {
+      showToast(err.message || 'Error al configurar', 'error');
+    } finally {
+      setConfigSubmitting(false);
+    }
+  };
+
   // Filters logic
+  const uniqueNodes = Array.from(new Set(clients.flatMap(c => c.contracts?.map(contract => contract.node?.name) || []).filter(Boolean))).sort();
+  const uniquePlans = Array.from(new Set(clients.flatMap(c => c.contracts?.map(contract => contract.plan?.name) || []).filter(Boolean))).sort();
+
   const filteredClients = clients.filter(c => {
     const matchesSearch = c.fullName.toLowerCase().includes(search.toLowerCase()) || 
                           c.dni.includes(search) || 
                           (c.phone1 && c.phone1.includes(search));
     const matchesStatus = statusFilter === '' || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    
+    let matchesNode = true;
+    if (nodeFilter !== '') {
+      matchesNode = c.contracts?.some(contract => contract.node?.name === nodeFilter) ?? false;
+    }
+
+    let matchesPlan = true;
+    if (planFilter !== '') {
+      matchesPlan = c.contracts?.some(contract => contract.plan?.name === planFilter) ?? false;
+    }
+
+    let matchesConnection = true;
+    if (connectionFilter !== '') {
+      if (connectionFilter === 'PPPoE') {
+        matchesConnection = c.contracts?.some(contract => !!contract.pppoeUsername) ?? false;
+      } else if (connectionFilter === 'StaticIP') {
+        matchesConnection = c.contracts?.some(contract => !!contract.staticIp) ?? false;
+      } else if (connectionFilter === 'UNCONFIGURED') {
+        matchesConnection = c.contracts?.some(contract => !contract.pppoeUsername && !contract.staticIp) ?? false;
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesNode && matchesPlan && matchesConnection;
   });
 
   const totalItems = filteredClients.length;
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginatedClients = filteredClients.slice(startIndex, startIndex + rowsPerPage);
 
+  const unconfiguredCount = clients.filter(c => 
+    c.contracts?.some(contract => !contract.pppoeUsername && !contract.staticIp)
+  ).length;
+
   return (
     <div className="page-container">
+      <TopProgressBar loading={loading} />
       {/* Header section */}
       <div className="title-block">
         <div>
@@ -208,6 +301,30 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
           </button>
         )}
       </div>
+
+      {/* Unconfigured Alert Banner */}
+      {unconfiguredCount > 0 && (
+        <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '1rem 1.5rem', marginBottom: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ backgroundColor: 'var(--accent)', color: '#fff', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+              !
+            </div>
+            <div>
+              <h3 style={{ color: 'var(--accent)', fontSize: '1rem', fontWeight: 700, margin: 0 }}>Atención: Hay {unconfiguredCount} cliente{unconfiguredCount !== 1 ? 's' : ''} sin configurar en el router</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '0.25rem 0 0 0' }}>
+                Estos clientes tienen contrato activo pero MikroTik no puede aplicarles reglas de velocidad o cortes.
+              </p>
+            </div>
+          </div>
+          <button 
+            className="btn" 
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--accent)', color: 'var(--accent)' }}
+            onClick={() => setConnectionFilter('UNCONFIGURED')}
+          >
+            Ver clientes afectados
+          </button>
+        </div>
+      )}
 
       {/* Educational description box */}
       <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
@@ -232,20 +349,54 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             style={{ paddingLeft: '2.5rem' }}
           />
         </div>
-        <div style={{ width: '200px' }}>
+        <div style={{ width: '160px' }}>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Todos los estados</option>
+            <option value="">Estados: Todos</option>
             <option value="ACTIVE">Activo</option>
             <option value="SUSPENDED">Suspendido</option>
             <option value="DELINQUENT">Moroso</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
         </div>
+        <div style={{ width: '160px' }}>
+          <select value={nodeFilter} onChange={(e) => setNodeFilter(e.target.value)}>
+            <option value="">MikroTik: Todos</option>
+            {uniqueNodes.map(node => (
+              <option key={node} value={node}>{node}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ width: '160px' }}>
+          <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
+            <option value="">Planes: Todos</option>
+            {uniquePlans.map(plan => (
+              <option key={plan} value={plan}>{plan}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ width: '160px' }}>
+          <select value={connectionFilter} onChange={(e) => setConnectionFilter(e.target.value)}>
+            <option value="">Red: Todas</option>
+            <option value="PPPoE">PPPoE</option>
+            <option value="StaticIP">IP Estática</option>
+            <option value="UNCONFIGURED">Sin configurar</option>
+          </select>
+        </div>
       </div>
 
       {/* Main List Table */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando clientes...</div>
+        <SkeletonTable rows={8} columns={['28%', '14%', '15%', '18%', '12%', '13%']} />
+      ) : error ? (
+        <div className="card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+          <WifiOff size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+          <h3>Error de conexión</h3>
+          <p style={{ marginBottom: '1.5rem' }}>{error}</p>
+          <button className="btn btn-primary" onClick={fetchClients}>
+            <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+            Reintentar
+          </button>
+        </div>
       ) : filteredClients.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
           No se encontraron clientes registrados con los filtros aplicados.
@@ -268,7 +419,11 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
               {paginatedClients.map((client) => (
                 <tr key={client.id}>
                   <td style={{ fontWeight: 600 }}>
-                    <div>{client.fullName}</div>
+                    <Link to={`/clients/${client.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', display: 'inline-block' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        {client.fullName}
+                      </div>
+                    </Link>
                     <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.25rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                       DNI: {client.dni} <br />
                       Tel: {client.phone1 || 'Sin contacto'} <br />
@@ -299,7 +454,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                             <div>
                               <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>PPPoE: </span>
                               <code>{contract.pppoeUsername}</code>
-                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Nodo: {contract.node.name}</div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>MikroTik: {contract.node.name}</div>
                             </div>
                           );
                         } else if (contract.staticIp) {
@@ -363,6 +518,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                         >
                           <Link 
                             to={`/clients/${client.id}`}
+                            className="action-menu-item"
                             style={{
                               display: 'block',
                               padding: '0.6rem 1rem',
@@ -375,8 +531,54 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                           >
                             Ver Ficha
                           </Link>
+                          {userRole !== 'READONLY' && (
+                            <Link 
+                              to={`/clients/${client.id}?edit=true`}
+                              className="action-menu-item"
+                              style={{
+                                display: 'block',
+                                padding: '0.6rem 1rem',
+                                color: 'var(--text-main)',
+                                textDecoration: 'none',
+                                fontSize: '0.85rem',
+                                borderBottom: '1px solid var(--border-color)'
+                              }}
+                              onClick={() => setActiveDropdown(null)}
+                            >
+                              Editar Datos
+                            </Link>
+                          )}
+                          {client.contracts && client.contracts.length > 0 && !client.contracts[0].pppoeUsername && !client.contracts[0].staticIp && (
+                            <button
+                              className="action-menu-item"
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '0.6rem 1rem',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-success)',
+                                fontSize: '0.85rem',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                borderBottom: '1px solid var(--border-color)'
+                              }}
+                              onClick={() => {
+                                setActiveDropdown(null);
+                                setConfigTarget({ 
+                                  id: client.id, 
+                                  name: client.fullName, 
+                                  contractId: client.contracts![0].id,
+                                  nodeName: client.contracts![0].node.name 
+                                });
+                              }}
+                            >
+                              Configurar en Router
+                            </button>
+                          )}
                           {userRole === 'ADMIN' && (
                             <button
+                              className="action-menu-item danger"
                               style={{
                                 display: 'block',
                                 width: '100%',
@@ -509,31 +711,115 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
           </div>
         </div>
       )}
-      {/* Custom Confirmation Modal for Client Deletion */}
+
+      {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="modal-backdrop" onClick={() => setDeleteTarget(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content bottom-sheet" onClick={(e) => e.stopPropagation()}>
             <button type="button" className="modal-close-btn" onClick={() => setDeleteTarget(null)} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Eliminar Abonado</h3>
-            <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-              ¿Está seguro de eliminar al cliente <strong>{deleteTarget.name}</strong>? Se borrarán también todos sus contratos asociados e historial de facturación de forma permanente.
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--status-error)' }}>Confirmar Eliminación</h3>
+            
+            <p style={{ color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+              ¿Está seguro que desea eliminar a <strong>{deleteTarget.name}</strong>? Esta acción eliminará su contrato y no se puede deshacer.
             </p>
+            
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancelar</button>
               <button 
                 type="button" 
                 className="btn btn-primary" 
+                style={{ backgroundColor: 'var(--status-error)' }}
                 onClick={() => {
-                  const targetId = deleteTarget.id;
+                  handleDeleteClient(deleteTarget.id);
                   setDeleteTarget(null);
-                  handleDeleteClient(targetId);
                 }}
               >
-                Eliminar Permanentemente
+                Eliminar Cliente
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Configurar en Router Modal */}
+      {configTarget && (
+        <div className="modal-backdrop" onClick={() => setConfigTarget(null)}>
+          <div className="modal-content bottom-sheet" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setConfigTarget(null)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Configurar Conexión: {configTarget.name}</h3>
+            
+            <div style={{ backgroundColor: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <div style={{ color: '#38bdf8', marginTop: '0.1rem' }}><RefreshCw size={18} /></div>
+              <div>
+                <h4 style={{ color: '#38bdf8', fontSize: '0.9rem', fontWeight: 700, margin: '0 0 0.25rem 0' }}>Sincronización Automática</h4>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, lineHeight: 1.4 }}>
+                  Este cliente está pre-asignado al MikroTik <strong>{configTarget.nodeName}</strong>. Al guardar, el sistema enviará los datos directamente a ese router y el cliente tendrá acceso a internet bajo su plan actual.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleConfigureRouter} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div className="form-group">
+                <label>Tipo de Conexión</label>
+                <select 
+                  value={configType} 
+                  onChange={(e) => setConfigType(e.target.value as 'PPPoE' | 'StaticIP')}
+                  disabled={configSubmitting}
+                >
+                  <option value="PPPoE">PPPoE (Recomendado)</option>
+                  <option value="StaticIP">IP Estática</option>
+                </select>
+              </div>
+
+              {configType === 'PPPoE' ? (
+                <>
+                  <div className="form-group">
+                    <label>Usuario PPPoE</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: cliente_123" 
+                      value={configUsername} 
+                      onChange={e => setConfigUsername(e.target.value)} 
+                      disabled={configSubmitting}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Contraseña PPPoE</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: 123456" 
+                      value={configPassword} 
+                      onChange={e => setConfigPassword(e.target.value)} 
+                      disabled={configSubmitting}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="form-group">
+                  <label>Dirección IP Estática</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: 192.168.10.50" 
+                    value={configIp} 
+                    onChange={e => setConfigIp(e.target.value)} 
+                    disabled={configSubmitting}
+                  />
+                </div>
+              )}
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setConfigTarget(null)} disabled={configSubmitting}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={configSubmitting}>
+                  {configSubmitting ? (
+                    <><RefreshCw size={14} className="animate-spin" /> Guardando...</>
+                  ) : 'Guardar y Configurar Router'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

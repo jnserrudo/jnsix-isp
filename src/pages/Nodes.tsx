@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Radio, Check, X, RefreshCw } from 'lucide-react';
+import { Plus, Radio, Check, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { showToast } from '../utils/toast';
-import LiveConnectionsTable from '../components/LiveConnectionsTable';
+import MikrotikDeviceScanner from '../components/MikrotikDeviceScanner';
 import TablePagination from '../components/mikrotik/TablePagination';
+import SkeletonTable from '../components/SkeletonTable';
+import TopProgressBar from '../components/TopProgressBar';
+import { fetchWithRetry } from '../utils/apiFetch';
 
 interface Node {
   id: string;
@@ -38,9 +41,11 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
     executedAt: string;
     errorMessage: string | null;
   }>>([]);
-  const [actionsLoading, setActionsLoading] = useState(false);
+  const [actionsLoading, setActionsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionsError, setActionsError] = useState<string | null>(null);
 
-  // Event pagination states
+  // Pagination for actions states
   const [evtCurrentPage, setEvtCurrentPage] = useState(1);
   const [evtRowsPerPage, setEvtRowsPerPage] = useState(10);
 
@@ -60,14 +65,15 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   const fetchNodes = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/nodes', {
+      setError(null);
+      const response = await fetchWithRetry('/api/nodes', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error cargando nodos');
       const data = await response.json();
       setNodes(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Error cargando nodos');
     } finally {
       setLoading(false);
     }
@@ -76,14 +82,15 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   const fetchActions = async () => {
     try {
       setActionsLoading(true);
-      const response = await fetch('/api/nodes/actions/log', {
+      setActionsError(null);
+      const response = await fetchWithRetry('/api/nodes/actions/log', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error cargando historial de acciones');
       const data = await response.json();
       setActions(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setActionsError(err.message || 'Error cargando historial de acciones');
     } finally {
       setActionsLoading(false);
     }
@@ -207,10 +214,11 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
 
   return (
     <div className="page-container">
+      <TopProgressBar loading={loading || actionsLoading} />
       {/* Header */}
       <div className="title-block">
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Nodos e Infraestructura</h2>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>Equipos MikroTik e Infraestructura</h2>
           <span style={{ color: 'var(--text-muted)' }}>Routers MikroTik core de distribución y OLTs de fibra</span>
         </div>
         {userRole === 'ADMIN' && (
@@ -223,7 +231,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
 
       {/* Educational description box */}
       <div className="card" style={{ marginBottom: '2rem', backgroundColor: 'var(--bg-tertiary)', padding: '1rem', borderLeft: '3px solid var(--accent)' }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Administración de Nodos</h3>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--accent)', marginBottom: '0.25rem' }}>Administración de Equipos MikroTik</h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
           Desde este panel puede dar de alta los equipos MikroTik (RB5009) y las OLTs de fibra (V-SOL GPON/EPON) que integran su red. 
           Es requisito indispensable habilitar el servicio API en cada router (puertos por defecto 8728 u 8729) y proveer un usuario con permisos de lectura y escritura. 
@@ -248,7 +256,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             marginBottom: '-1px'
           }}
         >
-          Nodos de Red
+          Equipos MikroTik
         </button>
         <button
           onClick={() => setActiveTab('actions')}
@@ -288,7 +296,17 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
 
       {activeTab === 'nodes' ? (
         loading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando nodos...</div>
+          <SkeletonTable rows={4} columns={['30%', '20%', '20%', '15%', '15%']} />
+        ) : error ? (
+          <div className="card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+            <AlertCircle size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+            <h3>Error de conexión</h3>
+            <p style={{ marginBottom: '1.5rem' }}>{error}</p>
+            <button className="btn btn-primary" onClick={fetchNodes}>
+              <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+              Reintentar
+            </button>
+          </div>
         ) : nodes.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
             No hay nodos registrados en la red. Agregue su router MikroTik para comenzar a integrar los bloqueos.
@@ -370,7 +388,20 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         )
       ) : activeTab === 'actions' ? (
         actionsLoading ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando historial de eventos...</div>
+          <div className="page-loader" style={{ minHeight: '30vh' }}>
+            <div className="ring-spinner" />
+            <span className="page-loader-label">Cargando historial de eventos...</span>
+          </div>
+        ) : actionsError ? (
+          <div className="card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+            <AlertCircle size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+            <h3>Error de conexión</h3>
+            <p style={{ marginBottom: '1.5rem' }}>{actionsError}</p>
+            <button className="btn btn-primary" onClick={fetchActions}>
+              <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+              Reintentar
+            </button>
+          </div>
         ) : actions.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
             No se han registrado acciones de MikroTik en el historial.
@@ -411,7 +442,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                     {/* Node */}
                     <div>
                       <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block' }}>
-                        Nodo de Red
+                        Equipo MikroTik
                       </span>
                       <span style={{ fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 500 }}>
                         {act.nodeName}
@@ -514,7 +545,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
               >
                 ← Volver a Nodos
               </button>
-              <LiveConnectionsTable nodeId={selectedNodeForRadar} />
+              <MikrotikDeviceScanner nodeId={selectedNodeForRadar} />
             </div>
           )}
         </div>
@@ -527,7 +558,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             <button type="button" className="modal-close-btn" onClick={() => setIsModalOpen(false)} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Añadir Nodo de Red</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Añadir Equipo MikroTik</h3>
             
             {formError && (
               <div style={{ backgroundColor: 'var(--color-danger-bg)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-danger)', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
@@ -538,7 +569,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             <form onSubmit={handleCreateNode} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
                 <div className="form-group">
-                  <label>Nombre del Nodo *</label>
+                  <label>Nombre del Equipo *</label>
                   <input type="text" placeholder="Ej: MikroTik Principal RB5009" value={name} onChange={e => setName(e.target.value)} required />
                 </div>
 
@@ -595,7 +626,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                     <>
                       <RefreshCw size={14} className="animate-spin" /> Guardando...
                     </>
-                  ) : 'Añadir Nodo'}
+                  ) : 'Añadir Equipo'}
                 </button>
               </div>
             </form>
@@ -609,9 +640,9 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             <button type="button" className="modal-close-btn" onClick={() => setDeleteTarget(null)} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Eliminar Nodo de Red</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Eliminar Equipo MikroTik</h3>
             <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
-              ¿Está seguro de eliminar el nodo <strong>{deleteTarget.name}</strong>? Se eliminarán todas las configuraciones asociadas de forma permanente.
+              ¿Está seguro de eliminar el equipo <strong>{deleteTarget.name}</strong>? Se eliminarán todas las configuraciones asociadas de forma permanente.
             </p>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancelar</button>

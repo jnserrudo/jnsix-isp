@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -105,6 +105,8 @@ interface ClientDetailProps {
 
 const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const [client, setClient] = useState<ClientDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -345,26 +347,41 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al vencer factura');
       showToast('Factura vencida con éxito', 'success');
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       showToast(err.message || 'Error al vencer factura', 'error');
     }
   };
 
-  const fetchClientData = async () => {
+  const fetchClientData = async (retryCount = 0, silent = false) => {
     try {
-      setLoading(true);
-      setError('');
+      if (retryCount === 0 && !silent) {
+        setLoading(true);
+        setError('');
+      }
       const response = await fetch(`/api/clients/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar datos del cliente');
       const data = await response.json();
       setClient(data);
+      if (!silent) setLoading(false);
     } catch (err: any) {
-      setError(err.message || 'Error de servidor');
-    } finally {
-      setLoading(false);
+      if (retryCount < 3) {
+        // Retry silently in the background
+        setTimeout(() => fetchClientData(retryCount + 1, silent), 1500);
+      } else {
+        let msg = err.message || 'Error de servidor';
+        if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('load failed')) {
+          msg = 'Error de conexión con el servidor. Verifique su internet.';
+        }
+        if (!silent) {
+          setError(msg);
+          setLoading(false);
+        } else {
+          showToast('No se pudieron actualizar los datos en segundo plano.', 'error');
+        }
+      }
     }
   };
 
@@ -383,6 +400,28 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     fetchClientData();
     fetchPlansAndNodes();
   }, [id, token]);
+
+  useEffect(() => {
+    if (client && location.search.includes('edit=true')) {
+      // Remove the query param to prevent re-opening on manual close
+      navigate(`/clients/${id}`, { replace: true });
+      
+      if (userRole !== 'READONLY') {
+        setEditFullName(client.fullName);
+        setEditDni(client.dni);
+        setEditPhone1(client.phone1 || '');
+        setEditPhone2(client.phone2 || '');
+        setEditEmail(client.email || '');
+        setEditAddress(client.address);
+        setEditLatitude(client.latitude ? client.latitude.toString() : '');
+        setEditLongitude(client.longitude ? client.longitude.toString() : '');
+        setEditStatus(client.status);
+        const migrationInfo = parseMigrationNotes(client.notes);
+        setEditNotes(migrationInfo ? migrationInfo.cleanNotes : (client.notes || ''));
+        setIsEditModalOpen(true);
+      }
+    }
+  }, [client, location.search, id, navigate, userRole]);
 
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -417,9 +456,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         throw new Error(data.error || 'Error al guardar contrato');
       }
 
-      showToast('Contrato asignado con éxito', 'success');
+      showToast('Contrato guardado con éxito', 'success');
       setIsContractModalOpen(false);
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al asignar contrato';
       showToast(errMsg, 'error');
@@ -461,7 +500,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       setPayAmount('');
       setPayRef('');
       setPayNotes('');
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al registrar el pago';
       showToast(errMsg, 'error');
@@ -489,7 +528,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Fallo de bloqueo');
       showToast('Servicio suspendido con éxito en MikroTik', 'success');
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al suspender servicio';
       showToast(errMsg, 'error');
@@ -509,7 +548,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Fallo de reactivación');
       showToast('Servicio reactivado con éxito en MikroTik', 'success');
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al reactivar servicio';
       showToast(errMsg, 'error');
@@ -567,9 +606,12 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al actualizar cliente');
 
+      // Optimistic UI Update: apply changes instantly
+      setClient(prev => prev ? { ...prev, ...data } : null);
+
       showToast('Cliente actualizado con éxito', 'success');
       setIsEditModalOpen(false);
-      fetchClientData();
+      fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error actualizando cliente';
       setEditFormError(errMsg);
@@ -579,8 +621,15 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     }
   };
 
-  if (loading) return <div style={{ color: 'var(--accent)', padding: '3rem', textAlign: 'center' }}>Cargando cliente...</div>;
-  if (error || !client) return <div style={{ color: 'var(--color-danger)', padding: '3rem', textAlign: 'center' }}>{error || 'Cliente no encontrado'}</div>;
+  if (loading) return <div style={{ color: 'var(--accent)', padding: '3rem', textAlign: 'center' }}>Cargando ficha del cliente...</div>;
+  if (error || !client) return (
+    <div style={{ color: 'var(--color-danger)', padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+      <div>{error || 'Cliente no encontrado'}</div>
+      <button className="btn btn-secondary" onClick={() => fetchClientData(0)} style={{ width: 'fit-content' }}>
+        <RefreshCw size={16} style={{ marginRight: '0.5rem' }} /> Reintentar
+      </button>
+    </div>
+  );
 
   const tieneUbicacion = client && client.latitude !== null && client.longitude !== null;
   const mapsUrl = client

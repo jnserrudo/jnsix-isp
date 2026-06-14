@@ -865,6 +865,98 @@ input::placeholder, textarea::placeholder {
   to { transform: rotate(360deg); }
 }
 
+/* ============================================================
+   PREMIUM LOADING UX — Skeleton Shimmer, Ring Spinner, Progress
+   ============================================================ */
+
+/* Skeleton shimmer sweep animation */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeleton-block {
+  background: linear-gradient(
+    90deg,
+    var(--bg-tertiary) 0%,
+    #2a2c31 40%,
+    var(--bg-tertiary) 80%
+  );
+  background-size: 600px 100%;
+  animation: skeleton-shimmer 1.6s infinite ease-in-out;
+  display: block;
+}
+
+/* Skeleton row: mimics a table row */
+.skeleton-row {
+  display: grid;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.95rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.skeleton-cell {
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Premium ring spinner */
+.ring-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50% !important;
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+.ring-spinner-sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
+.ring-spinner-lg {
+  width: 52px;
+  height: 52px;
+  border-width: 4px;
+}
+
+/* Full-page loader overlay */
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 55vh;
+  width: 100%;
+}
+
+.page-loader-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Top progress bar (NProgress-style) */
+.top-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 9999;
+  transition: width 0.25s ease, opacity 0.4s ease;
+  box-shadow: 0 0 6px var(--accent);
+  pointer-events: none;
+}
+
+
 /* Premium Blueprint Action Log Card List */
 .event-log-container {
   display: flex;
@@ -1014,8 +1106,6 @@ input::placeholder, textarea::placeholder {
 
   .node-summary-details {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
     width: 100%;
   }
 
@@ -1029,5 +1119,169 @@ input::placeholder, textarea::placeholder {
     border-bottom: none;
     padding-bottom: 0;
   }
+}
+
+/* ============================================================
+   FRONT 3: MOBILE UX PREMIUM UPGRADES
+   ============================================================ */
+
+/* 1. Touch targets (min 44px for clickable elements on mobile) */
+@media (max-width: 768px) {
+  button, 
+  .btn,
+  .action-menu-btn,
+  select,
+  input[type="text"],
+  input[type="number"],
+  input[type="password"] {
+    min-height: 44px;
+  }
+}
+
+/* 2. Bottom-Sheet Modals for Mobile */
+@media (max-width: 768px) {
+  .modal-overlay {
+    align-items: flex-end !important; /* Push modal to bottom */
+  }
+
+  .modal-content.bottom-sheet {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    padding: 2rem 1.5rem !important;
+    margin: 0 !important;
+    overflow-y: auto;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    position: relative;
+  }
+
+  /* Grabber handle for bottom sheet */
+  .modal-content.bottom-sheet::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 45px;
+    height: 5px;
+    background-color: var(--border-color);
+    border-radius: 5px;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 3. Horizontal Scrollable Filter Chips */
+.filter-chips-container {
+  display: flex;
+  gap: 0.6rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  scrollbar-width: none; /* Firefox */
+  -webkit-overflow-scrolling: touch;
+}
+.filter-chips-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip.active {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 4. Action Bottom Menu (for tables) */
+.action-bottom-menu {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  border-radius: 20px 20px 0 0;
+  z-index: 1000;
+  padding: 2rem 1.5rem 1.5rem 1.5rem;
+  transform: translateY(100%);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.5);
+}
+
+.action-bottom-menu::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 45px;
+  height: 5px;
+  background-color: var(--border-color);
+  border-radius: 5px;
+}
+
+.action-bottom-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(6, 6, 8, 0.8);
+  z-index: 999;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: left;
+  min-height: 56px !important;
+  cursor: pointer;
+}
+
+.action-menu-item:last-child {
+  border-bottom: none;
+}
+
+.action-menu-item.danger {
+  color: var(--status-error);
+}
+
+.action-menu-item:hover, .action-menu-item:active {
+  background-color: var(--bg-tertiary);
 }
 

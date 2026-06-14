@@ -71,7 +71,11 @@ export const Map: React.FC<MapProps> = ({ center, zoom, className, children }) =
     setMap(mapInstance);
 
     return () => {
-      mapInstance.remove();
+      try {
+        mapInstance.remove();
+      } catch (e) {
+        console.warn('Map cleanup error:', e);
+      }
     };
   }, []);
 
@@ -162,7 +166,11 @@ export const MapMarker: React.FC<MapMarkerProps> = ({
     }
 
     return () => {
-      marker.remove();
+      try {
+        marker.remove();
+      } catch (e) {
+        console.warn('Marker cleanup error:', e);
+      }
       markerRef.current = null;
     };
   }, [map, isLoaded, draggable]);
@@ -199,7 +207,11 @@ export const MapControls: React.FC<MapControlsProps> = ({ showZoom = true }) => 
     map.addControl(nav, 'top-right');
 
     return () => {
-      map.removeControl(nav);
+      try {
+        map.removeControl(nav);
+      } catch (e) {
+        console.warn('NavigationControl cleanup error:', e);
+      }
     };
   }, [map, isLoaded, showZoom]);
 

@@ -9,6 +9,8 @@ import {
   X
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { fetchWithRetry } from '../utils/apiFetch';
+import TopProgressBar from '../components/TopProgressBar';
 
 interface DashboardStats {
   clients: {
@@ -63,13 +65,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     try {
       setError('');
       const url = nodeId ? `/api/dashboard/stats?nodeId=${nodeId}` : '/api/dashboard/stats';
-      const response = await fetch(url, {
+      const response = await fetchWithRetry(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Error al cargar estadísticas');
-      }
       const data = await response.json();
       setStats(data);
     } catch (err: any) {
@@ -83,13 +81,11 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   useEffect(() => {
     const fetchNodes = async () => {
       try {
-        const res = await fetch('/api/nodes', {
+        const res = await fetchWithRetry('/api/nodes', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (res.ok) {
-          const data = await res.json();
-          setNodes(data);
-        }
+        const data = await res.json();
+        setNodes(data);
       } catch (err) {
         console.error('Error fetching nodes for dashboard selector:', err);
       }
@@ -170,10 +166,14 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
 
   if (loading && !stats) {
     return (
-      <div className="page-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
-        <div style={{ color: 'var(--accent)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <RefreshCw className="animate-spin" style={{ animation: 'spin 1.5s linear infinite' }} />
-          Cargando Panel de Control...
+      <div className="page-container">
+        <TopProgressBar loading={true} />
+        <div className="page-loader">
+          <div className="ring-spinner ring-spinner-lg" />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontWeight: 700, color: '#fff', marginBottom: '0.3rem' }}>Panel de Control</div>
+            <div className="page-loader-label">Cargando métricas del sistema...</div>
+          </div>
         </div>
       </div>
     );
@@ -186,6 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
 
   return (
     <div className="page-container">
+      <TopProgressBar loading={loading} />
       {/* Title block */}
       <div className="title-block" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -193,9 +194,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
           <span style={{ color: 'var(--text-muted)' }}>Métricas e infraestructura en tiempo real</span>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Node Selector */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <label style={{ margin: 0, textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por Nodo:</label>
+            <label style={{ margin: 0, textTransform: 'uppercase', fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>Filtrar por MikroTik:</label>
             <select
               value={selectedNodeId}
               onChange={(e) => setSelectedNodeId(e.target.value)}
@@ -211,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                 borderRadius: '0px'
               }}
             >
-              <option value="">-- Todos los Nodos --</option>
+              <option value="">-- Todos los Equipos MikroTik --</option>
               {nodes.map(n => (
                 <option key={n.id} value={n.id}>{n.name}</option>
               ))}
@@ -322,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
           )}
 
           {/* KPI Cards Grid */}
-          <div className="grid grid-cols-4 kpi-grid" style={{ marginBottom: '2rem' }}>
+          <div className={`grid ${selectedNodeId === '' ? 'grid-cols-4' : 'grid-cols-3'} kpi-grid`} style={{ marginBottom: '2rem' }}>
             <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
               <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
                 <Users size={28} color="var(--accent)" />
@@ -343,15 +343,17 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
               </div>
             </div>
 
-            <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-              <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
-                <TrendingUp size={28} color="var(--accent)" />
+            {selectedNodeId === '' && (
+              <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                <div className="icon-wrapper" style={{ border: '1px solid var(--border-color)', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', display: 'flex' }}>
+                  <TrendingUp size={28} color="var(--accent)" />
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Equipos MikroTik</span>
+                  <h4 className="kpi-value">{stats.nodesCount}</h4>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Nodos MikroTik</span>
-                <h4 className="kpi-value">{stats.nodesCount}</h4>
-              </div>
-            </div>
+            )}
 
             <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
               <div className="icon-wrapper" style={{ border: '1px solid var(--color-warning-border)', padding: '0.75rem', backgroundColor: 'var(--color-warning-bg)', display: 'flex' }}>
@@ -429,7 +431,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                           {action.clientName}
                         </div>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          Nodo: {action.nodeName} • {new Date(action.executedAt).toLocaleString()}
+                          MikroTik: {action.nodeName} • {new Date(action.executedAt).toLocaleString()}
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>

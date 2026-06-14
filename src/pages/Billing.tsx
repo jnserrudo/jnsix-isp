@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare } from 'lucide-react';
+import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare, WifiOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { fetchWithRetry } from '../utils/apiFetch';
 import TablePagination from '../components/mikrotik/TablePagination';
+import SkeletonTable from '../components/SkeletonTable';
+import TopProgressBar from '../components/TopProgressBar';
 
 interface Invoice {
   id: string;
@@ -20,6 +23,9 @@ interface Invoice {
     plan: {
       name: string;
     };
+    node?: {
+      name: string;
+    };
   };
 }
 
@@ -31,7 +37,11 @@ interface BillingProps {
 const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
+  const [nodeFilter, setNodeFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const [periodFilter, setPeriodFilter] = useState('');
   const [search, setSearch] = useState('');
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -95,7 +105,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   // Reset page when search or status filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, nodeFilter, planFilter, periodFilter]);
 
   useEffect(() => {
     const handleOutsideClick = () => {
@@ -116,19 +126,20 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
+      setError(null);
       let url = '/api/invoices';
       if (statusFilter) {
         url += `?status=${statusFilter}`;
       }
       
-      const response = await fetch(url, {
+      const response = await fetchWithRetry(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error al obtener facturas');
       const data = await response.json();
       setInvoices(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Error al obtener facturas');
     } finally {
       setLoading(false);
     }
@@ -195,10 +206,36 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
     }
   };
 
+  const uniqueNodes = Array.from(new Set(invoices.map(inv => inv.contract?.node?.name).filter(Boolean))).sort();
+  const uniquePlans = Array.from(new Set(invoices.map(inv => inv.contract?.plan?.name).filter(Boolean))).sort();
+  const uniquePeriods = Array.from(new Set(invoices.map(inv => {
+    const d = new Date(inv.issuedAt);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }))).sort().reverse();
+
   const filteredInvoices = invoices.filter(inv => {
-    return inv.client.fullName.toLowerCase().includes(search.toLowerCase()) || 
-           inv.client.dni.includes(search) ||
-           inv.invoiceNumber.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = inv.client.fullName.toLowerCase().includes(search.toLowerCase()) || 
+                          inv.client.dni.includes(search) ||
+                          inv.invoiceNumber.toLowerCase().includes(search.toLowerCase());
+
+    let matchesNode = true;
+    if (nodeFilter !== '') {
+      matchesNode = inv.contract?.node?.name === nodeFilter;
+    }
+
+    let matchesPlan = true;
+    if (planFilter !== '') {
+      matchesPlan = inv.contract?.plan?.name === planFilter;
+    }
+
+    let matchesPeriod = true;
+    if (periodFilter !== '') {
+      const d = new Date(inv.issuedAt);
+      const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      matchesPeriod = period === periodFilter;
+    }
+
+    return matchesSearch && matchesNode && matchesPlan && matchesPeriod;
   });
 
   const totalItems = filteredInvoices.length;
@@ -207,6 +244,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
 
   return (
     <div className="page-container">
+      <TopProgressBar loading={loading} />
       {/* Title */}
       <div className="title-block">
         <div>
@@ -237,19 +275,54 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
             style={{ paddingLeft: '2.5rem' }}
           />
         </div>
-        <div style={{ width: '200px' }}>
+        <div style={{ width: '160px' }}>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">Todas las facturas</option>
+            <option value="">Estado: Todos</option>
             <option value="PENDING">Pendientes</option>
             <option value="PAID">Pagadas</option>
             <option value="OVERDUE">Vencidas</option>
+          </select>
+        </div>
+        <div style={{ width: '160px' }}>
+          <select value={nodeFilter} onChange={(e) => setNodeFilter(e.target.value)}>
+            <option value="">Nodos: Todos</option>
+            {uniqueNodes.map(n => (
+              <option key={n as string} value={n as string}>{n as string}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ width: '160px' }}>
+          <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}>
+            <option value="">Planes: Todos</option>
+            {uniquePlans.map(p => (
+              <option key={p as string} value={p as string}>{p as string}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ width: '160px' }}>
+          <select value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)}>
+            <option value="">Periodos: Todos</option>
+            {uniquePeriods.map(p => {
+              const [y, m] = (p as string).split('-');
+              return <option key={p as string} value={p as string}>{m}/{y}</option>;
+            })}
           </select>
         </div>
       </div>
 
       {/* Table */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>Cargando facturación...</div>
+        <SkeletonTable rows={7} columns={['15%', '25%', '18%', '12%', '15%', '10%', '5%']} />
+      ) : error ? (
+        <div className="card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+          <WifiOff size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+          <h3>Error de conexión</h3>
+          <p style={{ marginBottom: '1.5rem' }}>{error}</p>
+          <button className="btn btn-primary" onClick={fetchInvoices}>
+            <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+            Reintentar
+          </button>
+        </div>
       ) : filteredInvoices.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
           No se encontraron facturas emitidas.

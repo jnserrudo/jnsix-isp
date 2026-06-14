@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, X, RefreshCw, History, Edit, Trash2 } from 'lucide-react';
+import { Plus, X, RefreshCw, History, Edit, Trash2, WifiOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
+import { fetchWithRetry } from '../utils/apiFetch';
 import TablePagination from '../components/mikrotik/TablePagination';
+import SkeletonTable from '../components/SkeletonTable';
+import TopProgressBar from '../components/TopProgressBar';
 
 interface Plan {
   id: string;
@@ -15,6 +18,11 @@ interface Plan {
   _count?: {
     contracts: number;
   };
+  nodesBreakdown?: {
+    id: string;
+    name: string;
+    count: number;
+  }[];
 }
 
 interface AuditLog {
@@ -33,6 +41,8 @@ interface PlansProps {
 const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [nodeFilter, setNodeFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
@@ -60,14 +70,15 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/plans', {
+      setError(null);
+      const response = await fetchWithRetry('/api/plans', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('Error cargando planes');
       const data = await response.json();
       setPlans(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err.message || 'Error cargando planes');
       showToast('Error al obtener la lista de planes', 'error');
     } finally {
       setLoading(false);
@@ -110,13 +121,13 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
     setLoadingHistory(true);
     setHistoryLogs([]);
     try {
-      const response = await fetch(`/api/audit/entity/PLAN/${plan.id}`, {
+      const response = await fetchWithRetry(`/api/audit/entity/PLAN/${plan.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!response.ok) throw new Error('Error al cargar historial');
       const data = await response.json();
       setHistoryLogs(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       showToast('Error al obtener historial de aumentos', 'error');
     } finally {
@@ -135,12 +146,12 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
 
     setSubmitting(true);
     const method = editingPlanId ? 'PUT' : 'POST';
-    const endpoint = editingPlanId ? `/api/plans/${editingPlanId}` : '/api/plans';
+    const url = editingPlanId ? `/api/plans/${editingPlanId}` : '/api/plans';
     
     showToast(editingPlanId ? 'Actualizando plan...' : 'Creando plan...', 'info');
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetchWithRetry(url, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -178,7 +189,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
     setSubmitting(true);
     showToast('Eliminando plan...', 'info');
     try {
-      const response = await fetch(`/api/plans/${deleteTarget.id}`, {
+      const response = await fetchWithRetry(`/api/plans/${deleteTarget.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -196,13 +207,23 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
     }
   };
 
-  // Pagination calculations
-  const totalItems = plans.length;
+  // Pagination and filtering calculations
+  const uniqueNodes = Array.from(new Set(plans.flatMap(p => p.nodesBreakdown?.map(n => n.name) || []).filter(Boolean))).sort();
+
+  const filteredPlans = plans.filter(p => {
+    if (nodeFilter !== '') {
+      return p.nodesBreakdown?.some(n => n.name === nodeFilter) ?? false;
+    }
+    return true;
+  });
+
+  const totalItems = filteredPlans.length;
   const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedPlans = plans.slice(startIndex, startIndex + rowsPerPage);
+  const paginatedPlans = filteredPlans.slice(startIndex, startIndex + rowsPerPage);
 
   return (
     <div className="page-container">
+      <TopProgressBar loading={loading} />
       {/* Header */}
       <div className="title-block">
         <div>
@@ -227,11 +248,30 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
         </p>
       </div>
 
+      {/* Filter Bar */}
+      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ width: '200px' }}>
+          <select value={nodeFilter} onChange={(e) => setNodeFilter(e.target.value)}>
+            <option value="">Nodos: Todos</option>
+            {uniqueNodes.map(n => (
+              <option key={n as string} value={n as string}>{n as string}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Plans List */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--accent)' }}>
-          <RefreshCw className="animate-spin" size={24} style={{ margin: '0 auto 1rem' }} />
-          Cargando planes...
+        <SkeletonTable rows={6} columns={['22%', '18%', '15%', '20%', '15%', '5%', '5%']} />
+      ) : error ? (
+        <div className="card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+          <WifiOff size={48} style={{ marginBottom: '1rem', opacity: 0.5, margin: '0 auto' }} />
+          <h3>Error de conexión</h3>
+          <p style={{ marginBottom: '1.5rem' }}>{error}</p>
+          <button className="btn btn-primary" onClick={fetchPlans}>
+            <RefreshCw size={18} style={{ marginRight: '0.5rem' }} />
+            Reintentar
+          </button>
         </div>
       ) : plans.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
@@ -277,8 +317,15 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
                   </td>
                   <td style={{ fontWeight: 600 }}>
                     <span style={{ color: (plan._count?.contracts || 0) > 0 ? 'var(--color-success)' : 'var(--text-muted)' }}>
-                      {plan._count?.contracts || 0} clientes
+                      {plan._count?.contracts || 0} clientes totales
                     </span>
+                    {plan.nodesBreakdown && plan.nodesBreakdown.length > 0 && (
+                      <div style={{ marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {plan.nodesBreakdown.map(n => (
+                          <div key={n.id}>- {n.name}: {n.count}</div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <span className={`badge ${plan.isActive ? 'badge-active' : 'badge-suspended'}`}>
