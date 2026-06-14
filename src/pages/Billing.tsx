@@ -5,6 +5,7 @@ import { fetchWithRetry } from '../utils/apiFetch';
 import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
+import FormAlert from '../components/FormAlert';
 
 interface Invoice {
   id: string;
@@ -122,6 +123,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [paymentFormError, setPaymentFormError] = useState('');
 
   const fetchInvoices = async () => {
     try {
@@ -151,7 +153,15 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
 
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInvoice) return;
+    setPaymentFormError('');
+    if (!selectedInvoice) {
+      setPaymentFormError('No hay factura seleccionada.');
+      return;
+    }
+    if (!payAmount || parseFloat(payAmount) <= 0) {
+      setPaymentFormError('Ingrese un monto válido a pagar.');
+      return;
+    }
 
     setSubmitting(true);
     showToast('Registrando pago...', 'info');
@@ -569,11 +579,12 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
               Registrando cobro para la factura <strong>{selectedInvoice.invoiceNumber}</strong> de <strong>{selectedInvoice.client.fullName}</strong>.
             </p>
 
-            <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={paymentFormError} />
                 <div className="form-group">
                   <label>Monto Recibido ($ ARS) *</label>
-                  <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} required />
+                  <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
                 </div>
 
                 <div className="form-group">

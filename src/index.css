@@ -512,19 +512,22 @@ th.desktop-only, td.desktop-only {
   padding: 1.25rem 1.5rem;
   width: 100%;
   max-width: 650px;
-  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
   position: relative;
+  /* Remove overflow: hidden to allow body scroll if needed, or keep it and scroll body */
   overflow: hidden;
 }
 
 .modal-body {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding-right: 0.5rem;
   margin-top: 0.5rem;
+  padding-bottom: 1rem; /* space for keyboard/scrolling */
 }
 
 /* Modal Footer controls */
@@ -1147,13 +1150,22 @@ input::placeholder, textarea::placeholder {
   .modal-content.bottom-sheet {
     width: 100% !important;
     max-width: 100% !important;
-    max-height: 90vh;
+    max-height: calc(100dvh - 2rem);
     border-radius: 20px 20px 0 0;
-    padding: 2rem 1.5rem !important;
+    padding: 2rem 1.5rem calc(env(safe-area-inset-bottom, 20px) + 2rem) !important;
     margin: 0 !important;
     overflow-y: auto;
+    overscroll-behavior: contain;
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     position: relative;
+  }
+  
+  /* Ensure forms in modals take full height and scroll properly */
+  .modal-content.bottom-sheet form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 100%;
   }
 
   /* Grabber handle for bottom sheet */

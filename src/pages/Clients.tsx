@@ -7,6 +7,7 @@ import MapPicker from '../components/MapPicker';
 import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
+import FormAlert from '../components/FormAlert';
 
 interface Contract {
   id: string;
@@ -62,6 +63,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [longitude, setLongitude] = useState('');
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
+  const [configError, setConfigError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -201,20 +203,27 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
 
   const handleConfigureRouter = async (e: React.FormEvent) => {
     e.preventDefault();
+    setConfigError('');
     if (!configTarget) return;
+
+    const payload: any = {};
+    if (configType === 'PPPoE') {
+      if (!configUsername || !configPassword) {
+        setConfigError('Complete usuario y contraseña PPPoE');
+        return;
+      }
+      payload.pppoeUsername = configUsername;
+      payload.pppoePassword = configPassword;
+    } else {
+      if (!configIp) {
+        setConfigError('Complete la dirección IP Estática');
+        return;
+      }
+      payload.staticIp = configIp;
+    }
 
     setConfigSubmitting(true);
     try {
-      const payload: any = {};
-      if (configType === 'PPPoE') {
-        if (!configUsername || !configPassword) throw new Error('Complete usuario y contraseña PPPoE');
-        payload.pppoeUsername = configUsername;
-        payload.pppoePassword = configPassword;
-      } else {
-        if (!configIp) throw new Error('Complete la dirección IP Estática');
-        payload.staticIp = configIp;
-      }
-
       const response = await fetchWithRetry(`/api/contracts/${configTarget.contractId}`, {
         method: 'PUT',
         headers: {
@@ -626,23 +635,18 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             </button>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Crear Nuevo Cliente</h3>
             
-            {formError && (
-              <div style={{ backgroundColor: 'var(--color-danger-bg)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-danger)', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateClient} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleCreateClient} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={formError} />
                 <div className="form-group">
                   <label>Nombre Completo *</label>
-                  <input type="text" placeholder="Ej: Nahuel Dev" value={fullName} onChange={e => setFullName(e.target.value)} required />
+                  <input type="text" placeholder="Ej: Nahuel Dev" value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" placeholder="DNI sin puntos" value={dni} onChange={e => setDni(e.target.value)} required />
+                    <input type="text" placeholder="DNI sin puntos" value={dni} onChange={(e) => setDni(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>Email</label>
@@ -663,7 +667,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
 
                 <div className="form-group">
                   <label>Dirección Completa (con referencias) *</label>
-                  <textarea rows={2} placeholder="Ej: Calle Falsa 123. Casa portón verde frente al kiosco." value={address} onChange={e => setAddress(e.target.value)} required />
+                  <textarea rows={2} placeholder="Ej: Calle Falsa 123. Casa portón verde frente al kiosco." value={address} onChange={e => setAddress(e.target.value)} />
                 </div>
 
                 <div className="form-group">
@@ -762,7 +766,12 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
               </div>
             </div>
 
+            <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', fontSize: '0.9rem' }}>
+              Seleccione cómo este cliente se conectará a la red. Esta configuración se provisionará en el nodo.
+            </p>
+
             <form onSubmit={handleConfigureRouter} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <FormAlert message={configError} />
               <div className="form-group">
                 <label>Tipo de Conexión</label>
                 <select 

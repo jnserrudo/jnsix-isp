@@ -5,6 +5,7 @@ import { fetchWithRetry } from '../utils/apiFetch';
 import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
+import FormAlert from '../components/FormAlert';
 
 interface Plan {
   id: string;
@@ -387,66 +388,33 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
             <button type="button" className="modal-close-btn" onClick={() => setIsModalOpen(false)} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>
               {editingPlanId ? 'Editar Plan de Internet' : 'Crear Nuevo Plan de Internet'}
             </h3>
 
-            {formError && (
-              <div style={{ backgroundColor: 'var(--color-danger-bg)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--accent)', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <FormAlert message={formError} />
                 <div className="form-group">
                   <label>Nombre del Plan *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ej: Plan Fibra 100 Mbps"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
+                  <input type="text" placeholder="Ej: Residencial 50 Megas" value={name} onChange={e => setName(e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label>Velocidad de Bajada (Mbps) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="100"
-                      value={downloadSpeed}
-                      onChange={(e) => setDownloadSpeed(e.target.value)}
-                    />
+                    <label>Bajada (Mbps) *</label>
+                    <input type="number" placeholder="50" value={downloadSpeed} onChange={e => setDownloadSpeed(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label>Velocidad de Subida (Mbps) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="30"
-                      value={uploadSpeed}
-                      onChange={(e) => setUploadSpeed(e.target.value)}
-                    />
+                    <label>Subida (Mbps) *</label>
+                    <input type="number" placeholder="10" value={uploadSpeed} onChange={e => setUploadSpeed(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label>Precio Mensual (ARS) *</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      placeholder="30000.00"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                    />
+                    <label>Precio Mensual ($ ARS) *</label>
+                    <input type="number" placeholder="15000" value={price} onChange={e => setPrice(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>MikroTik Profile Name</label>

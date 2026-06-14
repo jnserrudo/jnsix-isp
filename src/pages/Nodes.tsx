@@ -6,6 +6,7 @@ import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
 import { fetchWithRetry } from '../utils/apiFetch';
+import FormAlert from '../components/FormAlert';
 
 interface Node {
   id: string;
@@ -558,40 +559,35 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
             <button type="button" className="modal-close-btn" onClick={() => setIsModalOpen(false)} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Añadir Equipo MikroTik</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Agregar Nuevo Nodo (Router)</h3>
             
-            {formError && (
-              <div style={{ backgroundColor: 'var(--color-danger-bg)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-danger)', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {formError}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateNode} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleCreateNode} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={formError} />
                 <div className="form-group">
-                  <label>Nombre del Equipo *</label>
-                  <input type="text" placeholder="Ej: MikroTik Principal RB5009" value={name} onChange={e => setName(e.target.value)} required />
+                  <label>Nombre del Nodo / Identificador *</label>
+                  <input type="text" placeholder="Ej: Nodo Principal Torre 1" value={name} onChange={e => setName(e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-3" style={{ gap: '1rem' }}>
                   <div className="form-group col-span-2">
                     <label>IP / Host Pública o Local *</label>
-                    <input type="text" placeholder="Ej: 190.111.45.12 o 192.168.88.1" value={host} onChange={e => setHost(e.target.value)} required />
+                    <input type="text" placeholder="Ej: 190.111.45.12 o 192.168.88.1" value={host} onChange={e => setHost(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>Puerto API *</label>
-                    <input type="number" value={port} onChange={e => setPort(e.target.value)} required />
+                    <input type="number" value={port} onChange={e => setPort(e.target.value)} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
-                    <label>Usuario API RouterOS *</label>
-                    <input type="text" placeholder="Ej: api_user" value={user} onChange={e => setUser(e.target.value)} required />
+                    <label>Usuario API *</label>
+                    <input type="text" placeholder="admin" value={user} onChange={e => setUser(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>Contraseña API *</label>
-                    <input type="password" placeholder="Contraseña" value={pass} onChange={e => setPass(e.target.value)} required />
+                    <input type="password" placeholder="***" value={pass} onChange={e => setPass(e.target.value)} />
                   </div>
                 </div>
 

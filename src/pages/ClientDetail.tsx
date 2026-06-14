@@ -20,6 +20,7 @@ import {
 import { showToast } from '../utils/toast';
 import { Map, MapMarker, MarkerContent } from '../components/Map';
 import MapPicker from '../components/MapPicker';
+import FormAlert from '../components/FormAlert';
 
 interface Plan { id: string; name: string; price: number; downloadSpeed: number; uploadSpeed: number; }
 interface Node { id: string; name: string; mikrotikHost: string; }
@@ -153,6 +154,8 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [editStatus, setEditStatus] = useState<'ACTIVE' | 'SUSPENDED' | 'DELINQUENT' | 'CANCELLED'>('ACTIVE');
   const [editNotes, setEditNotes] = useState('');
   const [editFormError, setEditFormError] = useState('');
+  const [contractFormError, setContractFormError] = useState('');
+  const [paymentFormError, setPaymentFormError] = useState('');
   const [confirmModalType, setConfirmModalType] = useState<'block' | 'unblock' | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
@@ -425,7 +428,11 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
   const handleCreateContract = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlanId || !selectedNodeId) return;
+    setContractFormError('');
+    if (!selectedPlanId || !selectedNodeId) {
+      setContractFormError('Debe seleccionar un plan y un nodo para crear el contrato.');
+      return;
+    }
 
     setSubmitting(true);
     showToast('Asignando contrato...', 'info');
@@ -469,7 +476,15 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
   const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInvoice) return;
+    setPaymentFormError('');
+    if (!selectedInvoice) {
+      setPaymentFormError('Debe seleccionar una factura para pagar.');
+      return;
+    }
+    if (!payAmount || parseFloat(payAmount) <= 0) {
+      setPaymentFormError('Debe ingresar un monto válido a pagar.');
+      return;
+    }
 
     setSubmitting(true);
     showToast('Registrando pago...', 'info');
@@ -1647,8 +1662,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               <X size={18} />
             </button>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Asignar Plan y Configuración MikroTik</h3>
-            <form onSubmit={handleCreateContract} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleCreateContract} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={contractFormError} />
                 <div className="form-group">
                   <label>Plan Contratado *</label>
                   <select value={selectedPlanId} onChange={e => setSelectedPlanId(e.target.value)} required>
@@ -1753,8 +1769,9 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               Registrando cobro para la factura <strong>{selectedInvoice.invoiceNumber}</strong> por un total de ${Number(selectedInvoice.amount).toLocaleString()} ARS.
             </p>
 
-            <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={paymentFormError} />
                 <div className="form-group">
                   <label>Monto Recibido ($ ARS) *</label>
                   <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} required />
@@ -1807,27 +1824,22 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
             </button>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Editar Datos del Cliente</h3>
             
-            {editFormError && (
-              <div style={{ backgroundColor: 'var(--color-danger-bg)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--color-danger)', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {editFormError}
-              </div>
-            )}
-
-            <form onSubmit={handleEditClient} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleEditClient} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                <FormAlert message={editFormError} />
                 <div className="form-group">
                   <label>Nombre Completo *</label>
-                  <input type="text" placeholder="Ej: Nahuel Dev" value={editFullName} onChange={e => setEditFullName(e.target.value)} required />
+                  <input type="text" placeholder="Ej: Nahuel Dev" value={editFullName} onChange={e => setEditFullName(e.target.value)} />
                 </div>
                 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" placeholder="DNI sin puntos" value={editDni} onChange={e => setEditDni(e.target.value)} required />
+                    <input type="text" placeholder="DNI sin puntos" value={editDni} onChange={e => setEditDni(e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label>Estado *</label>
-                    <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)} required>
+                    <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)}>
                       <option value="ACTIVE">Activo</option>
                       <option value="SUSPENDED">Suspendido</option>
                       <option value="DELINQUENT">Moroso</option>
@@ -1854,7 +1866,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
                 <div className="form-group">
                   <label>Dirección Completa *</label>
-                  <textarea rows={2} placeholder="Dirección completa" value={editAddress} onChange={e => setEditAddress(e.target.value)} required />
+                  <input type="text" placeholder="Dirección completa" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
                 </div>
 
                 <div className="form-group">
