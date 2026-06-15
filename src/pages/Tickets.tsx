@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, AlertCircle, Clock, CheckCircle, Ticket as TicketIcon } from 'lucide-react';
+import { Plus, Search, Ticket as TicketIcon } from 'lucide-react';
 
 interface Ticket {
   id: string;
@@ -17,7 +17,7 @@ interface TicketsProps {
   userRole: string;
 }
 
-const Tickets: React.FC<TicketsProps> = ({ token, userRole }) => {
+const Tickets: React.FC<TicketsProps> = ({ token }) => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
