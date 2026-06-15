@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldCheck, Filter, RefreshCw, Calendar, User, Activity, Database, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldCheck, Filter, RefreshCw, Calendar, User, Activity, Database, AlertCircle, ChevronDown, ChevronUp, ArrowRight, Plus, Minus } from 'lucide-react';
 import { fetchWithRetry } from '../utils/apiFetch';
 import { showToast } from '../utils/toast';
 import TopProgressBar from '../components/TopProgressBar';
@@ -58,6 +58,111 @@ interface AuditProps {
   userRole: string;
 }
 
+// Map for common key translations
+const keyTranslations: Record<string, string> = {
+  fullName: 'Nombre Completo',
+  phone: 'Teléfono',
+  address: 'Dirección',
+  documentId: 'DNI/Documento',
+  status: 'Estado',
+  planId: 'Plan',
+  nodeId: 'Nodo',
+  pppoeUsername: 'Usuario PPPoE',
+  pppoePassword: 'Password PPPoE',
+  staticIp: 'IP Estática',
+  macAddress: 'Dirección MAC',
+  onuSerial: 'Serial ONU',
+  onuModel: 'Modelo ONU',
+  dueDate: 'Fecha de Vencimiento',
+  amount: 'Monto',
+  paymentMethod: 'Método de Pago',
+  reference: 'Referencia',
+  notes: 'Notas',
+  description: 'Descripción',
+  priority: 'Prioridad',
+  assignedTo: 'Asignado a',
+  quantity: 'Cantidad',
+  type: 'Tipo',
+  serialNumber: 'Número de Serie',
+};
+
+const translateKey = (key: string) => keyTranslations[key] || key;
+
+const formatValue = (val: any): string => {
+  if (val === null || val === undefined) return 'N/A';
+  if (typeof val === 'boolean') return val ? 'Sí' : 'No';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
+};
+
+const DiffViewer: React.FC<{ oldValues: any, newValues: any }> = ({ oldValues, newValues }) => {
+  const o = oldValues || {};
+  const n = newValues || {};
+  const allKeys = Array.from(new Set([...Object.keys(o), ...Object.keys(n)]));
+
+  const changes = allKeys.map(key => {
+    const oldVal = o[key];
+    const newVal = n[key];
+    const isAdded = oldVal === undefined && newVal !== undefined;
+    const isRemoved = oldVal !== undefined && newVal === undefined;
+    const isChanged = oldVal !== newVal && !isAdded && !isRemoved;
+
+    return { key, oldVal, newVal, isAdded, isRemoved, isChanged };
+  }).filter(c => c.isAdded || c.isRemoved || c.isChanged);
+
+  if (changes.length === 0) {
+    return <div style={{ padding: '1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>No se registraron cambios específicos en los datos.</div>;
+  }
+
+  return (
+    <div style={{ padding: '1rem' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+        <thead>
+          <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+            <th style={{ padding: '0.5rem', textAlign: 'left', width: '25%' }}>Campo</th>
+            <th style={{ padding: '0.5rem', textAlign: 'left', width: '35%' }}>Valor Anterior</th>
+            <th style={{ padding: '0.5rem', textAlign: 'center', width: '5%' }}></th>
+            <th style={{ padding: '0.5rem', textAlign: 'left', width: '35%' }}>Valor Nuevo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {changes.map((change, idx) => (
+            <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <td style={{ padding: '0.5rem', fontWeight: 600, color: 'var(--text-main)' }}>{translateKey(change.key)}</td>
+              <td style={{ padding: '0.5rem' }}>
+                {!change.isAdded && (
+                  <span style={{ 
+                    color: change.isRemoved || change.isChanged ? '#fca5a5' : 'var(--text-muted)',
+                    textDecoration: change.isRemoved || change.isChanged ? 'line-through' : 'none',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                  }}>
+                    {change.isRemoved && <Minus size={12} />}
+                    {formatValue(change.oldVal)}
+                  </span>
+                )}
+              </td>
+              <td style={{ padding: '0.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                {change.isChanged && <ArrowRight size={14} />}
+              </td>
+              <td style={{ padding: '0.5rem' }}>
+                {!change.isRemoved && (
+                  <span style={{ 
+                    color: change.isAdded || change.isChanged ? '#86efac' : 'var(--text-muted)',
+                    display: 'inline-flex', alignItems: 'center', gap: '0.25rem'
+                  }}>
+                    {change.isAdded && <Plus size={12} />}
+                    {formatValue(change.newVal)}
+                  </span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 const Audit: React.FC<AuditProps> = ({ token }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,11 +189,16 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
         page: currentPage.toString(),
         pageSize: pageSize.toString(),
         ...(filterEntity && { entity: filterEntity }),
-        ...(filterAction && { action: filterAction })
+        ...(filterAction && { action: filterAction }),
+        t: Date.now().toString() // Prevent caching
       });
 
       const response = await fetchWithRetry(`/api/audit?${query}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate'
+        },
+        cache: 'no-store'
       });
       const data = await response.json();
       
@@ -254,26 +364,8 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
                       {isExpanded && (
                         <tr style={{ backgroundColor: 'rgba(56, 189, 248, 0.02)' }}>
                           <td colSpan={5} style={{ padding: '0' }}>
-                            <div style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-                              <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 700 }}>Inspección Profunda de Datos</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: '1rem' }}>
-                                <div>
-                                  <span style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: 'var(--accent)' }}>Valores Anteriores:</span>
-                                  <pre style={{ backgroundColor: '#0a0a0a', padding: '0.75rem', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', border: '1px solid #222', color: '#888', whiteSpace: 'pre-wrap' }}>
-                                    {log.oldValues && Object.keys(log.oldValues).length > 0 
-                                      ? JSON.stringify(log.oldValues, null, 2) 
-                                      : 'No aplicable (Ninguno)'}
-                                  </pre>
-                                </div>
-                                <div>
-                                  <span style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.8rem', color: 'var(--color-success)' }}>Nuevos Valores Aplicados:</span>
-                                  <pre style={{ backgroundColor: '#0a0a0a', padding: '0.75rem', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', border: '1px solid #222', color: '#ddd', whiteSpace: 'pre-wrap' }}>
-                                    {log.newValues && Object.keys(log.newValues).length > 0 
-                                      ? JSON.stringify(log.newValues, null, 2) 
-                                      : 'No aplicable (Ninguno)'}
-                                  </pre>
-                                </div>
-                              </div>
+                            <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
+                              <DiffViewer oldValues={log.oldValues} newValues={log.newValues} />
                             </div>
                           </td>
                         </tr>

@@ -640,7 +640,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     }
   };
 
-  if (loading) return <div style={{ color: 'var(--accent)', padding: '3rem', textAlign: 'center' }}>Cargando ficha del cliente...</div>;
+  if (loading) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '6rem 2rem', color: 'var(--accent)', gap: '1.5rem', animation: 'fadeIn 0.5s ease-out' }}>
+      <RefreshCw size={48} className="animate-spin" style={{ filter: 'drop-shadow(0 0 8px var(--accent))' }} />
+      <div style={{ fontSize: '1.25rem', fontWeight: 600, letterSpacing: '1px' }}>Cargando ficha del cliente...</div>
+      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Obteniendo historial, contratos y pagos</div>
+    </div>
+  );
   if (error || !client) return (
     <div style={{ color: 'var(--color-danger)', padding: '3rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
       <div>{error || 'Cliente no encontrado'}</div>
