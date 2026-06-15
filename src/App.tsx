@@ -13,6 +13,10 @@ import MikrotikManagementCenter from './pages/MikrotikManagementCenter';
 import MigrationWizard from './pages/MigrationWizard';
 import Plans from './pages/Plans';
 import Audit from './pages/Audit';
+import Inventory from './pages/Inventory';
+import Tickets from './pages/Tickets';
+import PortalLogin from './pages/PortalLogin';
+import PortalDashboard from './pages/PortalDashboard';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -53,7 +57,6 @@ const App: React.FC = () => {
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = Math.random().toString();
-    // Only keep the single newest toast to prevent stacking
     setToasts([{ id, message, type }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
@@ -83,6 +86,50 @@ const App: React.FC = () => {
 
   const isAuthenticated = !!token && !!user;
 
+  const MainLayout = () => {
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    
+    return (
+      <div className="app-container">
+        <Sidebar 
+          onLogout={handleLogout} 
+          userRole={user.role} 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)} 
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebarCollapse}
+        />
+        <div className="main-content">
+          <Header 
+            userName={user.fullName} 
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+          />
+          <Routes>
+            <Route path="/" element={<Dashboard token={token} userRole={user.role} />} />
+            <Route path="/clients" element={<Clients token={token} userRole={user.role} />} />
+            <Route path="/clients/:id" element={<ClientDetail token={token} userRole={user.role} />} />
+            <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
+            <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
+            <Route path="/mikrotik-test" element={<MikrotikTest />} />
+            <Route path="/mikrotik-management" element={
+              user.role === 'ADMIN' || user.role === 'OPERATOR' ? <MikrotikManagementCenter /> : <Navigate to="/" replace />
+            } />
+            <Route path="/migration-wizard" element={
+              user.role === 'ADMIN' ? <MigrationWizard /> : <Navigate to="/" replace />
+            } />
+            <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
+            <Route path="/audit" element={
+              user.role === 'ADMIN' ? <Audit token={token} userRole={user.role} /> : <Navigate to="/" replace />
+            } />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/tickets" element={<Tickets token={token!} userRole={user.role} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Router>
       <div className="toast-container">
@@ -98,63 +145,13 @@ const App: React.FC = () => {
           </div>
         ))}
       </div>
-      {!isAuthenticated ? (
-        <Routes>
-          <Route path="/login" element={<Login onLoginSuccess={handleLoginSuccess} />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      ) : (
-        <div className="app-container">
-          {/* Left Sidebar */}
-          <Sidebar 
-            onLogout={handleLogout} 
-            userRole={user.role} 
-            isOpen={isSidebarOpen} 
-            onClose={() => setIsSidebarOpen(false)} 
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={handleToggleSidebarCollapse}
-          />
 
-          {/* Right Layout */}
-          <div className="main-content">
-            <Header 
-              userName={user.fullName} 
-              onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
-            />
-            <Routes>
-              <Route path="/" element={<Dashboard token={token} userRole={user.role} />} />
-              <Route path="/clients" element={<Clients token={token} userRole={user.role} />} />
-              <Route path="/clients/:id" element={<ClientDetail token={token} userRole={user.role} />} />
-              <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
-              <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
-              <Route path="/mikrotik-test" element={<MikrotikTest />} />
-              <Route path="/mikrotik-management" element={
-                user.role === 'ADMIN' || user.role === 'OPERATOR' ? (
-                  <MikrotikManagementCenter />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              } />
-              <Route path="/migration-wizard" element={
-                user.role === 'ADMIN' ? (
-                  <MigrationWizard />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              } />
-              <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
-              <Route path="/audit" element={
-                user.role === 'ADMIN' ? (
-                  <Audit token={token} userRole={user.role} />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              } />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </div>
-        </div>
-      )}
+      <Routes>
+        <Route path="/login" element={!isAuthenticated ? <Login onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" replace />} />
+        <Route path="/portal" element={<PortalLogin />} />
+        <Route path="/portal/dashboard" element={<PortalDashboard />} />
+        <Route path="/*" element={<MainLayout />} />
+      </Routes>
     </Router>
   );
 };

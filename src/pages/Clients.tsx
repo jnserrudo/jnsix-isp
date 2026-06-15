@@ -61,6 +61,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [address, setAddress] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [clientCode, setClientCode] = useState('');
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
   const [configError, setConfigError] = useState('');
@@ -148,6 +149,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
         body: JSON.stringify({
           fullName,
           dni,
+          clientCode,
           phone1,
           phone2,
           email,
@@ -166,6 +168,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
       setIsModalOpen(false);
       setFullName('');
       setDni('');
+      setClientCode('');
       setPhone1('');
       setPhone2('');
       setEmail('');
@@ -734,6 +737,13 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                     <input type="text" placeholder="DNI sin puntos" value={dni} onChange={(e) => setDni(e.target.value)} />
                   </div>
                   <div className="form-group">
+                    <label>Código de Cliente *</label>
+                    <input type="text" placeholder="Ej: CL-001" value={clientCode} onChange={(e) => setClientCode(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2" style={{ gap: '1rem', marginTop: '1rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label>Email</label>
                     <input type="email" placeholder="ejemplo@correo.com" value={email} onChange={e => setEmail(e.target.value)} />
                   </div>

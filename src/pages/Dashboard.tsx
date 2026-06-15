@@ -11,6 +11,9 @@ import {
 import { showToast } from '../utils/toast';
 import { fetchWithRetry } from '../utils/apiFetch';
 import TopProgressBar from '../components/TopProgressBar';
+import {
+  BarChart, Bar, XAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
+} from 'recharts';
 
 interface DashboardStats {
   clients: {
@@ -201,7 +204,8 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
               onChange={(e) => setSelectedNodeId(e.target.value)}
               disabled={loading}
               style={{
-                width: '200px',
+                width: 'auto',
+                minWidth: '250px',
                 padding: '0.4rem 0.75rem',
                 backgroundColor: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
@@ -211,7 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                 borderRadius: '0px'
               }}
             >
-              <option value="">-- Todos los Equipos MikroTik --</option>
+              <option value=""> Todos </option>
               {nodes.map(n => (
                 <option key={n.id} value={n.id}>{n.name}</option>
               ))}
@@ -385,7 +389,29 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                 <div style={{ width: `${collectedPct}%`, height: '100%', backgroundColor: 'var(--accent)', borderRadius: '5px', transition: 'width 0.5s ease' }} />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <div style={{ height: '200px', width: '100%', marginTop: '1rem' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={[
+                      { name: 'Cobrado', amount: stats.billingMonth.collected, fill: '#10b981' },
+                      { name: 'Pendiente', amount: stats.billingMonth.pending, fill: '#f59e0b' }
+                    ]}
+                    margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                    <XAxis dataKey="name" stroke="#888" tick={{fill: '#888'}} />
+                    <RechartsTooltip 
+                      cursor={{fill: 'rgba(255, 255, 255, 0.05)'}}
+                      contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', borderRadius: '8px' }}
+                      itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                      formatter={(value: any) => [`$${value.toLocaleString('es-AR')}`, 'Monto']}
+                    />
+                    <Bar dataKey="amount" radius={[4, 4, 0, 0]} barSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem' }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Por Cobrar</span>
                   <p style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-warning)' }}>

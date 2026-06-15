@@ -198,7 +198,7 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
           </div>
         ) : (
           <div className="table-wrapper">
-            <table className="mobile-card-list">
+            <table>
               <thead>
                 <tr>
                   <th>Fecha y Hora</th>

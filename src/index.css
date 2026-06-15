@@ -198,17 +198,35 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-nav {
   flex: 1;
-  padding: 1.5rem 1rem;
+  padding: 1.5rem 0;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  overflow-y: auto;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 2rem;
   color: var(--text-muted);
   font-size: 0.9rem;
   font-weight: 500;
@@ -223,8 +241,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .sidebar-link.active {
   color: #ffffff;
-  background-color: var(--bg-primary);
-  border-left: 2px solid var(--accent);
+  background-color: var(--bg-tertiary);
+  border-left: 3px solid var(--accent);
+  padding-left: calc(2rem - 3px);
 }
 
 .sidebar-footer {

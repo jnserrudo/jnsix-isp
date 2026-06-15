@@ -316,14 +316,16 @@ export default function MikrotikTest() {
   };
 
   return (
-    <div className="page-wrapper">
-      <div className="page-header-section">
-        <h1 className="page-title">Pruebas MikroTik</h1>
-        <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>Herramientas de diagnóstico y prueba de conexión</p>
+    <div className="page-container fade-in">
+      <div className="page-header" style={{ marginBottom: '2rem' }}>
+        <div>
+          <h1 className="page-title">Pruebas MikroTik</h1>
+          <p className="page-subtitle">Herramientas de diagnóstico y prueba de conexión</p>
+        </div>
       </div>
 
       {/* Credenciales */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>Credenciales de Conexión</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <div>
@@ -334,7 +336,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setCredentials({ ...credentials, host: e.target.value })
               }
-              className="form-input"
+              className="form-control"
               placeholder="192.168.60.1"
             />
           </div>
@@ -346,7 +348,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setCredentials({ ...credentials, port: e.target.value })
               }
-              className="form-input"
+              className="form-control"
               placeholder="8728"
             />
           </div>
@@ -358,7 +360,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setCredentials({ ...credentials, user: e.target.value })
               }
-              className="form-input"
+              className="form-control"
               placeholder="admin"
             />
           </div>
@@ -370,7 +372,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setCredentials({ ...credentials, password: e.target.value })
               }
-              className="form-input"
+              className="form-control"
               placeholder="••••••••"
             />
           </div>
@@ -378,7 +380,7 @@ export default function MikrotikTest() {
       </div>
 
       {/* Test de Conexión */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>1. Test de Conexión</h2>
         <button
           onClick={testConnection}
@@ -396,7 +398,7 @@ export default function MikrotikTest() {
       </div>
 
       {/* Inicializar Router */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>2. Inicializar Router</h2>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
           Crea la regla de firewall y address-list necesarias para el sistema
@@ -412,7 +414,7 @@ export default function MikrotikTest() {
       </div>
 
       {/* Comandos Manuales */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>3. Ejecutar Comando Manual</h2>
         <div style={{ marginBottom: '0.75rem' }}>
           <label className="form-label">Comando RouterOS</label>
@@ -420,7 +422,7 @@ export default function MikrotikTest() {
             type="text"
             value={command}
             onChange={(e) => setCommand(e.target.value)}
-            className="form-input"
+            className="form-control"
             style={{ fontFamily: 'monospace' }}
             placeholder="/system/resource/print"
           />
@@ -436,7 +438,7 @@ export default function MikrotikTest() {
       </div>
 
       {/* Crear Secret PPPoE */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>4. Crear Secret PPPoE</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '0.75rem' }}>
           <div>
@@ -447,7 +449,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setPppoeData({ ...pppoeData, username: e.target.value })
               }
-              className="form-input"
+              className="form-control"
             />
           </div>
           <div>
@@ -458,7 +460,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setPppoeData({ ...pppoeData, password: e.target.value })
               }
-              className="form-input"
+              className="form-control"
             />
           </div>
           <div>
@@ -469,7 +471,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setPppoeData({ ...pppoeData, profile: e.target.value })
               }
-              className="form-input"
+              className="form-control"
             />
           </div>
         </div>
@@ -484,7 +486,7 @@ export default function MikrotikTest() {
       </div>
 
       {/* Crear Queue */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>5. Crear Queue</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '0.75rem' }}>
           <div>
@@ -495,7 +497,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setQueueData({ ...queueData, name: e.target.value })
               }
-              className="form-input"
+              className="form-control"
             />
           </div>
           <div>
@@ -506,7 +508,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setQueueData({ ...queueData, target: e.target.value })
               }
-              className="form-input"
+              className="form-control"
             />
           </div>
           <div>
@@ -517,7 +519,7 @@ export default function MikrotikTest() {
               onChange={(e) =>
                 setQueueData({ ...queueData, maxLimit: e.target.value })
               }
-              className="form-input"
+              className="form-control"
               placeholder="10M/10M"
             />
           </div>
@@ -533,14 +535,14 @@ export default function MikrotikTest() {
       </div>
 
       {/* Listar Recursos */}
-      <div className="data-card" style={{ marginBottom: '2rem', padding: '2rem' }}>
+      <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1.5rem', color: '#ffffff' }}>6. Listar Recursos</h2>
         <div style={{ marginBottom: '0.75rem' }}>
           <label className="form-label">Tipo de Recurso</label>
           <select
             value={resourceType}
             onChange={(e) => setResourceType(e.target.value)}
-            className="form-input"
+            className="form-control"
           >
             <option value="secrets">PPPoE Secrets</option>
             <option value="queues">Queues</option>

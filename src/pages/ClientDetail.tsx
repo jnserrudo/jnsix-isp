@@ -85,6 +85,7 @@ interface ClientDetailData {
   id: string;
   fullName: string;
   dni: string;
+  clientCode: string;
   phone1: string | null;
   phone2: string | null;
   email: string | null;
@@ -145,6 +146,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFullName, setEditFullName] = useState('');
   const [editDni, setEditDni] = useState('');
+  const [editClientCode, setEditClientCode] = useState('');
   const [editPhone1, setEditPhone1] = useState('');
   const [editPhone2, setEditPhone2] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -412,6 +414,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       if (userRole !== 'READONLY') {
         setEditFullName(client.fullName);
         setEditDni(client.dni);
+        setEditClientCode(client.clientCode || '');
         setEditPhone1(client.phone1 || '');
         setEditPhone2(client.phone2 || '');
         setEditEmail(client.email || '');
@@ -607,6 +610,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         body: JSON.stringify({
           fullName: editFullName,
           dni: editDni,
+          clientCode: editClientCode,
           phone1: editPhone1 || null,
           phone2: editPhone2 || null,
           email: editEmail || null,
@@ -750,7 +754,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
           <div className="title-block" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
             <div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{client.fullName}</h2>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • ID: {client.id.slice(0,8)}</span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • Código: {client.clientCode || 'N/A'} • ID: {client.id.slice(0,8)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               {userRole !== 'READONLY' && (
@@ -759,6 +763,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                   onClick={() => {
                     setEditFullName(client.fullName);
                     setEditDni(client.dni);
+                    setEditClientCode(client.clientCode || '');
                     setEditPhone1(client.phone1 || '');
                     setEditPhone2(client.phone2 || '');
                     setEditEmail(client.email || '');
@@ -1837,6 +1842,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                     <label>DNI *</label>
                     <input type="text" placeholder="DNI sin puntos" value={editDni} onChange={e => setEditDni(e.target.value)} />
                   </div>
+                  <div className="form-group">
+                    <label>Código de Cliente *</label>
+                    <input type="text" placeholder="Ej: CL-001" value={editClientCode} onChange={e => setEditClientCode(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>Estado *</label>
                     <select value={editStatus} onChange={e => setEditStatus(e.target.value as any)}>
