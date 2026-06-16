@@ -95,7 +95,7 @@ const MikrotikTopologyScanner: React.FC<Props> = ({ nodeId, token, onImportNode 
       showToast('Escaneo de red completado exitosamente', 'success');
     } catch (err: any) {
       setError(err.message || 'Error al obtener topología');
-      showToast(err.message, 'error');
+      showToast(err.message, 'warning');
     } finally {
       setLoading(false);
     }

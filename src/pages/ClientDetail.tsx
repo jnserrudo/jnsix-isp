@@ -15,7 +15,9 @@ import {
   Radio,
   Printer,
   MessageSquare,
-  Activity
+  Activity,
+  MessageCircle,
+  CheckCircle, Info, AlertTriangle, Unplug
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { Map, MapMarker, MarkerContent } from '../components/Map';
@@ -172,6 +174,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [waMessage, setWaMessage] = useState('');
 
   // Invoice Print Preview Modal State
+  const [isSyncInfoModalOpen, setIsSyncInfoModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
 
@@ -304,7 +307,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
   const handleSendWhatsApp = () => {
     if (!waPhone) {
-      showToast('Por favor ingrese un número de teléfono', 'error');
+      showToast('Por favor ingrese un número de teléfono', 'warning');
       return;
     }
     const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}`;
@@ -332,7 +335,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       setIsDiagActive(true);
       showToast('Enlace de fibra y sesión en línea verificados', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Fallo de comunicación con el router', 'error');
+      showToast(err.message || 'Fallo de comunicación con el router', 'warning');
     } finally {
       setIsDiagnosticsLoading(false);
     }
@@ -354,7 +357,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       showToast('Factura vencida con éxito', 'success');
       fetchClientData(0, true);
     } catch (err: any) {
-      showToast(err.message || 'Error al vencer factura', 'error');
+      showToast(err.message || 'Error al vencer factura', 'warning');
     }
   };
 
@@ -384,7 +387,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
           setError(msg);
           setLoading(false);
         } else {
-          showToast('No se pudieron actualizar los datos en segundo plano.', 'error');
+          showToast('No se pudieron actualizar los datos en segundo plano.', 'warning');
         }
       }
     }
@@ -471,7 +474,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al asignar contrato';
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -521,7 +524,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al registrar el pago';
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -549,7 +552,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al suspender servicio';
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setRouterActionLoading(null);
     }
@@ -569,7 +572,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       fetchClientData(0, true);
     } catch (err: any) {
       const errMsg = err.message || 'Error al reactivar servicio';
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setRouterActionLoading(null);
     }
@@ -634,7 +637,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     } catch (err: any) {
       const errMsg = err.message || 'Error actualizando cliente';
       setEditFormError(errMsg);
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -751,49 +754,130 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         >
           Facturas
         </button>
+
       </div>
 
       {/* Main Grid: Details left, Map right */}
       <div className={`grid grid-cols-3 ${mobileTab === 'info' ? '' : 'desktop-only'}`} style={{ marginBottom: '2rem', alignItems: 'start' }}>
         {/* Customer Information Column */}
         <div className="card col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="title-block" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>{client.fullName}</h2>
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • Código: {client.clientCode || 'N/A'} • ID: {client.id.slice(0,8)}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              {userRole !== 'READONLY' && (
-                <button 
-                  className="btn btn-secondary btn-sm"
-                  onClick={() => {
-                    setEditFullName(client.fullName);
-                    setEditDni(client.dni);
-                    setEditClientCode(client.clientCode || '');
-                    setEditPhone1(client.phone1 || '');
-                    setEditPhone2(client.phone2 || '');
-                    setEditEmail(client.email || '');
-                    setEditAddress(client.address);
-                    setEditLatitude(client.latitude ? client.latitude.toString() : '');
-                    setEditLongitude(client.longitude ? client.longitude.toString() : '');
-                    setEditStatus(client.status);
-                    const migrationInfo = parseMigrationNotes(client.notes);
-                    setEditNotes(migrationInfo ? migrationInfo.cleanNotes : (client.notes || ''));
-                    setIsEditModalOpen(true);
-                  }}
-                >
-                  Editar Datos
-                </button>
-              )}
-              <span className={`badge ${
-                client.status === 'ACTIVE' ? 'badge-active' :
-                client.status === 'SUSPENDED' ? 'badge-suspended' :
-                client.status === 'DELINQUENT' ? 'badge-delinquent' : 'badge-cancelled'
-              }`}>
+          <div className="title-block" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* Row 1: Name and ID */}
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>{client.fullName}</h2>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • Código: {client.clientCode || 'N/A'} • ID: {client.id.slice(0,8)}</span>
+              </div>
+              
+              {/* Row 2: Status Badges */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <span className={`badge ${
+                  client.status === 'ACTIVE' ? 'badge-active' :
+                  client.status === 'SUSPENDED' ? 'badge-suspended' :
+                  client.status === 'DELINQUENT' ? 'badge-delinquent' : 'badge-cancelled'
+                }`}>
                 {client.status === 'ACTIVE' ? 'Activo' :
                  client.status === 'SUSPENDED' ? 'Suspendido' :
                  client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
-              </span>
+                </span>
+                
+                {(() => {
+                  const contract = client.contracts?.find((c: any) => c.status !== 'CANCELLED');
+                  if (!contract) return null;
+                  
+                  // Verification for "Sin configurar"
+                  const isUnconfigured =  (!contract.pppoeUsername && !contract.staticIp && !contract.macAddress);
+                  
+                  const InfoButton = () => (
+                    <button 
+                      onClick={() => setIsSyncInfoModalOpen(true)}
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: 0.8, padding: 0, margin: 0 }}
+                      title="¿Qué significa este estado?"
+                    >
+                      <Info size={14} />
+                    </button>
+                  );
+
+                  if (isUnconfigured) {
+                    return (
+                      <span className="badge badge-cancelled" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', opacity: 0.8 }}>
+                        <Unplug size={14} /> Desvinculado del Router <InfoButton />
+                      </span>
+                    );
+                  }
+                  
+                  const isBlockedInMikrotik = contract.status === 'SUSPENDED';
+                  const adminWantsBlocked = client.status === 'DELINQUENT' || client.status === 'SUSPENDED';
+                  
+                  if (adminWantsBlocked && !isBlockedInMikrotik) {
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(255, 193, 7, 0.15)', padding: '0 0.6rem', height: '24px', borderRadius: '4px', border: '1px solid var(--color-warning)', boxSizing: 'border-box' }}>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--color-warning)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase' }}><AlertTriangle size={14} /> Moroso pero ACTIVO en MikroTik <InfoButton /></span>
+                        <button onClick={handleBlockAction} className="btn btn-warning btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}>Suspender Ahora</button>
+                      </div>
+                    );
+                  }
+                  if (!adminWantsBlocked && isBlockedInMikrotik) {
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'rgba(255, 152, 0, 0.15)', padding: '0 0.6rem', height: '24px', borderRadius: '4px', border: '1px solid #ff9800', boxSizing: 'border-box' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#ff9800', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.3rem', textTransform: 'uppercase' }}><AlertTriangle size={14} /> Activo pero SUSPENDIDO en MikroTik <InfoButton /></span>
+                        <button onClick={handleUnblockAction} className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}>Reactivar Ahora</button>
+                      </div>
+                    );
+                  }
+                  
+                  // Synchronized
+                  return (
+                    <span className="badge badge-active" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'transparent', borderColor: 'var(--color-success)' }}>
+                      <CheckCircle size={14} /> Sincronizado <InfoButton />
+                    </span>
+                  );
+                })()}
+              </div>
+
+              {/* Row 3: Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                {userRole !== 'READONLY' && (
+                  <>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: '#25D366', color: '#25D366' }}
+                      onClick={() => {
+                        const portalUrl = window.location.origin + '/portal';
+                        const message = `Hola ${client.fullName}, ya puedes ingresar a tu portal de autogestión para ver tus facturas y crear tickets técnicos en ${portalUrl}. Tu usuario es tu DNI y tu contraseña temporal también es tu DNI (${client.dni}).`;
+                        const phone = client.phone1 ? client.phone1.replace(/\D/g, '') : '';
+                        if (phone) {
+                          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                        } else {
+                          showToast('El cliente no tiene un teléfono registrado.', 'warning');
+                        }
+                      }}
+                    >
+                      <MessageCircle size={16} /> Enviar Accesos (WhatsApp)
+                    </button>
+                    <button 
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setEditFullName(client.fullName);
+                        setEditDni(client.dni);
+                        setEditClientCode(client.clientCode || '');
+                        setEditPhone1(client.phone1 || '');
+                        setEditPhone2(client.phone2 || '');
+                        setEditEmail(client.email || '');
+                        setEditAddress(client.address);
+                        setEditLatitude(client.latitude ? client.latitude.toString() : '');
+                        setEditLongitude(client.longitude ? client.longitude.toString() : '');
+                        setEditStatus(client.status);
+                        const migrationInfo = parseMigrationNotes(client.notes);
+                        setEditNotes(migrationInfo ? migrationInfo.cleanNotes : (client.notes || ''));
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      Editar Datos
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1437,7 +1521,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                       );
                     })()}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 700 }}>${Number(invoice.amount).toLocaleString()}</span>
                     <span className={`badge ${
                       invoice.status === 'PAID' ? 'badge-active' :
@@ -1840,13 +1924,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                 <FormAlert message={editFormError} />
                 <div className="form-group">
                   <label>Nombre Completo *</label>
-                  <input type="text" placeholder="Ej: Nahuel Dev" value={editFullName} onChange={e => setEditFullName(e.target.value)} />
+                  <input type="text" className={!editFullName && editFormError ? "input-error" : ""} placeholder="Ej: Nahuel Dev" value={editFullName} onChange={e => { setEditFullName(e.target.value); if (editFormError) setEditFormError(""); }} />
                 </div>
                 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" placeholder="DNI sin puntos" value={editDni} onChange={e => setEditDni(e.target.value)} />
+                    <input type="text" className={!editDni && editFormError ? "input-error" : ""} placeholder="DNI sin puntos" value={editDni} onChange={e => { setEditDni(e.target.value); if (editFormError) setEditFormError(""); }} />
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>
@@ -1884,7 +1968,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
                 <div className="form-group">
                   <label>Dirección Completa *</label>
-                  <input type="text" placeholder="Dirección completa" value={editAddress} onChange={e => setEditAddress(e.target.value)} />
+                  <input type="text" className={!editAddress && editFormError ? "input-error" : ""} placeholder="Dirección completa" value={editAddress} onChange={e => { setEditAddress(e.target.value); if (editFormError) setEditFormError(""); }} />
                 </div>
 
                 <div className="form-group">
@@ -2138,6 +2222,50 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
           </div>
         </div>
       )}
+          {/* Sync Info Modal */}
+      {isSyncInfoModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsSyncInfoModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <button type="button" className="modal-close-btn" onClick={() => setIsSyncInfoModalOpen(false)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Estados de Sincronización</h3>
+            
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: '1.5' }}>
+                El indicador de sincronización compara el <strong>estado administrativo</strong> del cliente (su deuda y fichas) con el <strong>estado técnico</strong> real en el Router MikroTik. Aquí explicamos los posibles valores:
+              </p>
+              
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: '1rem', listStyle: 'none', padding: 0 }}>
+                <li style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', borderLeft: '3px solid var(--color-success)' }}>
+                  <strong style={{ color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}><CheckCircle size={16} /> Sincronizado</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Todo está correcto. Si el cliente está Activo, tiene internet. Si el cliente está Moroso, su internet está suspendido en el MikroTik.</span>
+                </li>
+                
+                <li style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 193, 7, 0.1)', borderRadius: '6px', borderLeft: '3px solid var(--color-warning)' }}>
+                  <strong style={{ color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}><AlertTriangle size={16} /> Moroso pero ACTIVO</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>El cliente ha sido marcado como MOROSO (o Suspendido) en su ficha administrativa, pero <strong>todavía tiene acceso a Internet</strong> porque no se le ha bloqueado en el router.</span>
+                </li>
+                
+                <li style={{ padding: '0.75rem', backgroundColor: 'rgba(255, 152, 0, 0.1)', borderRadius: '6px', borderLeft: '3px solid #ff9800' }}>
+                  <strong style={{ color: '#ff9800', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}><AlertTriangle size={16} /> Activo pero SUSPENDIDO</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>El cliente está al día y ACTIVO administrativamente (ej. recién pagó su factura), pero <strong>su internet sigue bloqueado</strong> en el router.</span>
+                </li>
+                
+                <li style={{ padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px', borderLeft: '3px solid var(--text-muted)' }}>
+                  <strong style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}><Unplug size={16} /> Desvinculado del Router</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Ocurre en clientes recién creados o <strong>importados por migración</strong>. El cliente existe administrativamente, pero no tiene una IP, usuario PPPoE ni equipo asignado, por lo que el sistema no puede controlar su conexión.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
+              <button type="button" className="btn btn-primary" onClick={() => setIsSyncInfoModalOpen(false)}>Entendido</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -42,7 +42,7 @@ const MikrotikActiveSessions: React.FC<Props> = ({ nodeId, token }) => {
       
     } catch (err: any) {
       setError(err.message || 'Error de red');
-      showToast(err.message, 'error');
+      showToast(err.message, 'warning');
     } finally {
       setLoading(false);
     }

@@ -15,8 +15,8 @@ import Plans from './pages/Plans';
 import Audit from './pages/Audit';
 import Inventory from './pages/Inventory';
 import Tickets from './pages/Tickets';
-import PortalLogin from './pages/PortalLogin';
 import PortalDashboard from './pages/PortalDashboard';
+
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -27,6 +27,7 @@ interface UserSession {
   email: string;
   fullName: string;
   role: string;
+  isClient?: boolean;
 }
 
 const App: React.FC = () => {
@@ -53,9 +54,9 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Global Toasts State
-  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>>([]);
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type: 'success' | 'warning' | 'info' }>>([]);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'warning' | 'info' = 'success') => {
     const id = Math.random().toString();
     setToasts([{ id, message, type }]);
     setTimeout(() => {
@@ -88,6 +89,11 @@ const App: React.FC = () => {
 
   const MainLayout = () => {
     if (!isAuthenticated) return <Navigate to="/login" replace />;
+    
+    // Si el usuario es un Cliente final, solo puede ver el portal
+    if (user.isClient) {
+      return <Navigate to="/portal" replace />;
+    }
     
     return (
       <div className="app-container">
@@ -130,6 +136,14 @@ const App: React.FC = () => {
     );
   };
 
+  const ClientLayout = () => {
+    if (!isAuthenticated) return <Navigate to="/login" replace />;
+    if (!user.isClient) return <Navigate to="/" replace />;
+    
+    // Aquí el cliente verá su dashboard de autogestión
+    return <PortalDashboard user={user} onLogout={handleLogout} token={token} />;
+  };
+
   return (
     <Router>
       <div className="toast-container">
@@ -138,7 +152,7 @@ const App: React.FC = () => {
             <span style={{
               width: '6px',
               height: '6px',
-              backgroundColor: t.type === 'success' ? 'var(--color-success)' : t.type === 'error' ? 'var(--accent)' : 'var(--color-warning)',
+              backgroundColor: t.type === 'success' ? 'var(--color-success)' : t.type === 'warning' ? 'var(--accent)' : 'var(--color-info)',
               display: 'inline-block'
             }} />
             {t.message}
@@ -147,9 +161,8 @@ const App: React.FC = () => {
       </div>
 
       <Routes>
-        <Route path="/login" element={!isAuthenticated ? <Login onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/" replace />} />
-        <Route path="/portal" element={<PortalLogin />} />
-        <Route path="/portal/dashboard" element={<PortalDashboard />} />
+        <Route path="/login" element={!isAuthenticated ? <Login onLoginSuccess={handleLoginSuccess} /> : <Navigate to={user?.isClient ? "/portal" : "/"} replace />} />
+        <Route path="/portal/*" element={<ClientLayout />} />
         <Route path="/*" element={<MainLayout />} />
       </Routes>
     </Router>

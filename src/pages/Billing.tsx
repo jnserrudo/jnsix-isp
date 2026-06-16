@@ -90,7 +90,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
 
   const handleSendWhatsApp = () => {
     if (!waPhone) {
-      showToast('Por favor ingrese un número de teléfono', 'error');
+      showToast('Por favor ingrese un número de teléfono', 'warning');
       return;
     }
     const url = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMessage)}`;
@@ -151,15 +151,16 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
     fetchInvoices();
   }, [token, statusFilter]);
 
-  const handleRegisterPayment = async (e: React.FormEvent) => {
+    const handleRegisterPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setPaymentFormError('');
-    if (!selectedInvoice) {
-      setPaymentFormError('No hay factura seleccionada.');
-      return;
-    }
-    if (!payAmount || parseFloat(payAmount) <= 0) {
-      setPaymentFormError('Ingrese un monto válido a pagar.');
+
+    const missingFields = [];
+    if (!selectedInvoice) missingFields.push('Factura Seleccionada');
+    if (!payAmount || parseFloat(payAmount) <= 0) missingFields.push('Monto a Pagar (debe ser mayor a 0)');
+
+    if (missingFields.length > 0) {
+      setPaymentFormError(`Atención, revisa lo siguiente: ${missingFields.join(', ')}`);
       return;
     }
 
@@ -173,7 +174,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          invoiceId: selectedInvoice.id,
+          invoiceId: selectedInvoice?.id,
           amount: parseFloat(payAmount),
           paymentMethod: payMethod,
           reference: payRef || null,
@@ -193,8 +194,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
       setPayNotes('');
       fetchInvoices();
     } catch (err: any) {
-      const errMsg = err.message || 'Error al procesar el pago';
-      showToast(errMsg, 'error');
+      setPaymentFormError(err.message || 'Error registrando el pago');
     } finally {
       setSubmitting(false);
     }
@@ -212,7 +212,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
       showToast('Factura vencida con éxito', 'success');
       fetchInvoices();
     } catch (err: any) {
-      showToast(err.message || 'Error al vencer factura', 'error');
+      showToast(err.message || 'Error al vencer factura', 'warning');
     }
   };
 
@@ -653,7 +653,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                 <FormAlert message={paymentFormError} />
                 <div className="form-group">
                   <label>Monto Recibido ($ ARS) *</label>
-                  <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+                  <input type="number" className={(!payAmount || parseFloat(payAmount) <= 0) && paymentFormError ? "input-error" : ""} value={payAmount} onChange={e => { setPayAmount(e.target.value); if (paymentFormError) setPaymentFormError(""); }} />
                 </div>
 
                 <div className="form-group">

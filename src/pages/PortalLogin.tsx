@@ -30,7 +30,7 @@ const PortalLogin: React.FC = () => {
       showToast('Inicio de sesión exitoso', 'success');
       navigate('/portal/dashboard');
     } catch (error: any) {
-      showToast(error.message, 'error');
+      showToast(error.message, 'warning');
     } finally {
       setLoading(false);
     }

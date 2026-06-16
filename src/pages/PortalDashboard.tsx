@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import PortalTickets from './PortalTickets';
+
 import { LogOut, FileText, Wifi, CheckCircle, XCircle, AlertCircle, Calendar } from 'lucide-react';
 import { showToast } from '../utils/toast';
 
@@ -11,18 +12,23 @@ interface ClientPortalData {
   invoices: Array<any>;
 }
 
-const PortalDashboard: React.FC = () => {
+interface PortalDashboardProps {
+  user: {
+    id: string;
+    fullName: string;
+  };
+  token: string | null;
+  onLogout: () => void;
+}
+
+const PortalDashboard: React.FC<PortalDashboardProps> = ({ user, token, onLogout }) => {
   const [data, setData] = useState<ClientPortalData | null>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'resumen' | 'tickets'>('resumen');
 
   useEffect(() => {
     const fetchInfo = async () => {
-      const token = localStorage.getItem('portal_token');
-      if (!token) {
-        navigate('/portal');
-        return;
-      }
+      if (!token) return;
 
       try {
         const response = await fetch('/api/portal/my-info', {
@@ -30,27 +36,21 @@ const PortalDashboard: React.FC = () => {
         });
 
         if (response.status === 401) {
-          localStorage.removeItem('portal_token');
-          navigate('/portal');
+          onLogout();
           return;
         }
 
         const json = await response.json();
         setData(json);
       } catch (err: any) {
-        showToast('Error de conexión', 'error');
+        showToast('Error de conexión', 'warning');
       } finally {
         setLoading(false);
       }
     };
 
     fetchInfo();
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('portal_token');
-    navigate('/portal');
-  };
+  }, [token, onLogout]);
 
   const getStatusBadge = (status: string) => {
     switch(status) {
@@ -89,23 +89,58 @@ const PortalDashboard: React.FC = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 'bold', fontSize: '1.2rem' }}>
-            {data.fullName.charAt(0).toUpperCase()}
+            {user.fullName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{data.fullName}</h2>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>{user.fullName}</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
               Estado General: {getStatusBadge(data.status)}
             </div>
           </div>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <button className="btn btn-secondary btn-sm" onClick={onLogout} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <LogOut size={16} /> Salir
         </button>
       </header>
 
+        <nav style={{ display: 'flex', gap: '2rem', padding: '0 2rem', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
+          <button 
+            className="btn" 
+            onClick={() => setActiveTab('resumen')}
+            style={{ 
+              padding: '1rem 0', 
+              border: 'none', 
+              borderBottom: activeTab === 'resumen' ? '3px solid var(--accent)' : '3px solid transparent', 
+              backgroundColor: 'transparent', 
+              color: activeTab === 'resumen' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 600,
+              borderRadius: 0 
+            }}
+          >
+            Resumen de Cuenta
+          </button>
+          <button 
+            className="btn" 
+            onClick={() => setActiveTab('tickets')}
+            style={{ 
+              padding: '1rem 0', 
+              border: 'none', 
+              borderBottom: activeTab === 'tickets' ? '3px solid var(--accent)' : '3px solid transparent', 
+              backgroundColor: 'transparent', 
+              color: activeTab === 'tickets' ? '#fff' : 'var(--text-muted)',
+              fontWeight: 600,
+              borderRadius: 0 
+            }}
+          >
+            Soporte Técnico
+          </button>
+        </nav>
+
       <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         
-        {/* Mis Servicios */}
+        {activeTab === 'resumen' && (
+          <>
+            {/* Mis Servicios */}
         <section>
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
             <Wifi size={20} color="var(--accent)" /> Mis Servicios
@@ -172,6 +207,12 @@ const PortalDashboard: React.FC = () => {
             </div>
           </div>
         </section>
+        </>
+        )}
+
+        {activeTab === 'tickets' && (
+          <PortalTickets token={token} />
+        )}
 
       </main>
     </div>

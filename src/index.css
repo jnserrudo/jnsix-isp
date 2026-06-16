@@ -655,6 +655,8 @@ tr:hover td {
   letter-spacing: 0.05em;
   border: 1px solid var(--border-color);
   background-color: transparent;
+  height: 24px; /* Fixed height for consistency */
+  box-sizing: border-box;
 }
 
 .badge-active {
@@ -1399,3 +1401,21 @@ input::placeholder, textarea::placeholder {
   background-color: var(--bg-tertiary);
 }
 
+
+.input-error { border-color: var(--accent) !important; box-shadow: 0 0 0 1px var(--accent) !important; }
+.input-error:focus { outline: none !important; }
+
+
+/* Responsive mobile wraps */
+@media (max-width: 768px) {
+  .btn {
+    white-space: normal;
+    text-align: center;
+    line-height: 1.2;
+    padding: 0.5rem;
+  }
+  
+  .badge {
+    white-space: nowrap;
+  }
+}

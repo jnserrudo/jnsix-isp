@@ -102,11 +102,11 @@ const Inventory: React.FC = () => {
         fetchItems();
         closeModal();
       } else {
-        (window as any).showToast('Error al guardar', 'error');
+        (window as any).showToast('Error al guardar', 'warning');
       }
     } catch (error) {
       console.error(error);
-      (window as any).showToast('Error de conexión', 'error');
+      (window as any).showToast('Error de conexión', 'warning');
     }
   };
 
@@ -121,11 +121,11 @@ const Inventory: React.FC = () => {
         (window as any).showToast('Ítem eliminado', 'success');
         fetchItems();
       } else {
-        (window as any).showToast('Error al eliminar', 'error');
+        (window as any).showToast('Error al eliminar', 'warning');
       }
     } catch (error) {
       console.error(error);
-      (window as any).showToast('Error de conexión', 'error');
+      (window as any).showToast('Error de conexión', 'warning');
     }
   };
 

@@ -84,7 +84,7 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
       fetchTickets();
       (window as any).showToast('Ticket guardado correctamente', 'success');
     } catch (err: any) {
-      (window as any).showToast(err.message, 'error');
+      (window as any).showToast(err.message, 'warning');
     }
   };
 

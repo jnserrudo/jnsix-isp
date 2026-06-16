@@ -62,7 +62,7 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
       setScannedAt(data.scannedAt);
     } catch (err: any) {
       setError(err.message || 'Error al obtener conexiones');
-      showToast(err.message, 'error');
+      showToast(err.message, 'warning');
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
     // Find the client to get their contract
     const client = clientsList.find(c => c.id === selectedClientId);
     if (!client || !client.contracts || client.contracts.length === 0) {
-      showToast('El cliente seleccionado no tiene un contrato válido.', 'error');
+      showToast('El cliente seleccionado no tiene un contrato válido.', 'warning');
       return;
     }
 
@@ -139,7 +139,7 @@ const MikrotikDeviceScanner: React.FC<MikrotikDeviceScannerProps> = ({ nodeId })
       setSelectedClientId('');
       fetchConnections(); // refresh the table
     } catch (err: any) {
-      showToast(err.message || 'Error al asociar', 'error');
+      showToast(err.message || 'Error al asociar', 'warning');
     } finally {
       setAssociateSubmitting(false);
     }

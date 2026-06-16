@@ -135,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     } catch (err: any) {
       const errMsg = err.message || 'Fallo de facturación manual';
       setError(errMsg);
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setActionLoading(null);
     }
@@ -161,7 +161,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     } catch (err: any) {
       const errMsg = err.message || 'Fallo de cortes manual';
       setError(errMsg);
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setActionLoading(null);
     }

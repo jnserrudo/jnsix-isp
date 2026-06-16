@@ -162,7 +162,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
     } catch (err: any) {
       const errMsg = err.message || 'Error guardando nodo';
       setFormError(errMsg);
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -182,11 +182,11 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         showToast('Conexión con el Nodo exitosa (API OK)', 'success');
       } else {
         setTestStatus(prev => ({ ...prev, [nodeId]: 'offline' }));
-        showToast('Error de conexión con el Nodo (API falló)', 'error');
+        showToast('Error de conexión con el Nodo (API falló)', 'warning');
       }
     } catch (err) {
       setTestStatus(prev => ({ ...prev, [nodeId]: 'offline' }));
-      showToast('Fallo al conectar con el Nodo de red', 'error');
+      showToast('Fallo al conectar con el Nodo de red', 'warning');
     }
   };
 
@@ -204,7 +204,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
       showToast('Nodo de red eliminado con éxito', 'success');
       fetchNodes();
     } catch (err: any) {
-      showToast(err.message || 'Error al eliminar nodo', 'error');
+      showToast(err.message || 'Error al eliminar nodo', 'warning');
     }
   };
 

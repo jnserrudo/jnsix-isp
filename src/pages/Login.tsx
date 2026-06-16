@@ -106,11 +106,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Correo Electrónico</label>
+            <label htmlFor="email">Usuario (DNI o Correo)</label>
             <input
               id="email"
-              type="email"
-              placeholder="ejemplo@jnsix.com"
+              type="text"
+              placeholder="Ej: 30123456 o admin@jnsix.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

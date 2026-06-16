@@ -80,7 +80,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Error cargando planes');
-      showToast('Error al obtener la lista de planes', 'error');
+      showToast('Error al obtener la lista de planes', 'warning');
     } finally {
       setLoading(false);
     }
@@ -130,7 +130,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
       setHistoryLogs(data);
     } catch (err: any) {
       console.error(err);
-      showToast('Error al obtener historial de aumentos', 'error');
+      showToast('Error al obtener historial de aumentos', 'warning');
     } finally {
       setLoadingHistory(false);
     }
@@ -179,7 +179,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
       fetchPlans();
     } catch (err: any) {
       setFormError(err.message);
-      showToast(err.message, 'error');
+      showToast(err.message, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -202,7 +202,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
       setDeleteTarget(null);
       fetchPlans();
     } catch (err: any) {
-      showToast(err.message, 'error');
+      showToast(err.message, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -451,7 +451,7 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
                 <FormAlert message={formError} />
                 <div className="form-group">
                   <label>Nombre del Plan *</label>
-                  <input type="text" placeholder="Ej: Residencial 50 Megas" value={name} onChange={e => setName(e.target.value)} />
+                  <input type="text" className={!name && formError ? "input-error" : ""} placeholder="Ej: Residencial 50 Megas" value={name} onChange={e => { setName(e.target.value); if (formError) setFormError(""); }} />
                 </div>
 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>

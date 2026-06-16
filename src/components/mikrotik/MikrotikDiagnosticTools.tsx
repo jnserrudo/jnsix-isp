@@ -38,7 +38,7 @@ const MikrotikDiagnosticTools: React.FC<Props> = ({ nodeId, token }) => {
       setResults(data);
       showToast('Diagnóstico finalizado', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Fallo de ping', 'error');
+      showToast(err.message || 'Fallo de ping', 'warning');
     } finally {
       setLoading(false);
     }

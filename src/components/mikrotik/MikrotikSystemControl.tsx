@@ -69,7 +69,7 @@ const MikrotikSystemControl: React.FC<Props> = ({ nodeId, token }) => {
       showToast('Comando de reinicio enviado correctamente. El router se apagará en unos segundos.', 'success');
       setShowRebootConfirm(false);
     } catch (err: any) {
-      showToast(err.message || 'Error al intentar reiniciar', 'error');
+      showToast(err.message || 'Error al intentar reiniciar', 'warning');
     } finally {
       setLoadingReboot(false);
     }
@@ -94,7 +94,7 @@ const MikrotikSystemControl: React.FC<Props> = ({ nodeId, token }) => {
       showToast('Copia de seguridad (.backup) generada y guardada en el router con éxito', 'success');
       setBackupName('');
     } catch (err: any) {
-      showToast(err.message || 'Error al generar backup', 'error');
+      showToast(err.message || 'Error al generar backup', 'warning');
     } finally {
       setLoadingBackup(false);
     }
@@ -134,7 +134,7 @@ const MikrotikSystemControl: React.FC<Props> = ({ nodeId, token }) => {
                 <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', border: 'none' }}>
                   <tbody>
                     {paginatedLogs.map((l, i) => {
-                      const isError = l.topics?.includes('error') || l.topics?.includes('critical');
+                      const isError = l.topics?.includes('warning') || l.topics?.includes('critical');
                       return (
                         <tr key={i} style={{ borderBottom: '1px solid #222' }}>
                           <td style={{ padding: '4px', color: '#888', whiteSpace: 'nowrap', width: '60px' }}>{l.time}</td>

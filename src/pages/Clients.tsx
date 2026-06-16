@@ -180,7 +180,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
     } catch (err: any) {
       const errMsg = err.message || 'Error guardando cliente';
       setFormError(errMsg);
-      showToast(errMsg, 'error');
+      showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
     }
@@ -200,7 +200,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
       showToast('Cliente eliminado con éxito', 'success');
       fetchClients();
     } catch (err: any) {
-      showToast(err.message || 'Error al eliminar cliente', 'error');
+      showToast(err.message || 'Error al eliminar cliente', 'warning');
     }
   };
 
@@ -249,7 +249,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
       setConfigIp('');
       fetchClients();
     } catch (err: any) {
-      showToast(err.message || 'Error al configurar', 'error');
+      showToast(err.message || 'Error al configurar', 'warning');
     } finally {
       setConfigSubmitting(false);
     }
@@ -728,13 +728,13 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                 <FormAlert message={formError} />
                 <div className="form-group">
                   <label>Nombre Completo *</label>
-                  <input type="text" placeholder="Ej: Nahuel Dev" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  <input type="text" className={!fullName && formError ? "input-error" : ""} placeholder="Ej: Nahuel Dev" value={fullName} onChange={(e) => { setFullName(e.target.value); if (formError) setFormError(""); }} />
                 </div>
                 
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" placeholder="DNI sin puntos" value={dni} onChange={(e) => setDni(e.target.value)} />
+                    <input type="text" className={!dni && formError ? "input-error" : ""} placeholder="DNI sin puntos" value={dni} onChange={(e) => { setDni(e.target.value); if (formError) setFormError(""); }} />
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>

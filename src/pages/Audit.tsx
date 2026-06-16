@@ -212,7 +212,7 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Error al cargar el historial de auditoría');
-      showToast('Error cargando auditoría', 'error');
+      showToast('Error cargando auditoría', 'warning');
     } finally {
       setLoading(false);
     }
