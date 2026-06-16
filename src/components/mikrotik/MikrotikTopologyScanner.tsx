@@ -196,7 +196,7 @@ const MikrotikTopologyScanner: React.FC<Props> = ({ nodeId, token, onImportNode 
                       ) : (
                         <span className="badge badge-suspended" style={{ fontSize: '0.7rem' }}>Requiere IP</span>
                       )}
-                      {dev.platform.toLowerCase().includes('mikrotik') ? (
+                      {dev.platform && typeof dev.platform === 'string' && dev.platform.toLowerCase().includes('mikrotik') ? (
                         onImportNode && (
                           <button 
                             className="btn btn-sm btn-primary" 

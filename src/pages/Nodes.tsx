@@ -6,6 +6,7 @@ import MikrotikTopologyScanner from '../components/mikrotik/MikrotikTopologyScan
 import MikrotikDiagnosticTools from '../components/mikrotik/MikrotikDiagnosticTools';
 import MikrotikActiveSessions from '../components/mikrotik/MikrotikActiveSessions';
 import MikrotikSystemControl from '../components/mikrotik/MikrotikSystemControl';
+import MikrotikSystemResources from '../components/mikrotik/MikrotikSystemResources';
 import TablePagination from '../components/mikrotik/TablePagination';
 import SkeletonTable from '../components/SkeletonTable';
 import TopProgressBar from '../components/TopProgressBar';
@@ -37,7 +38,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   // Tabs state
   const [activeMainTab, setActiveMainTab] = useState<'nodes' | 'actions'>('nodes');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [activeDetailTab, setActiveDetailTab] = useState<'radar' | 'topology' | 'ping' | 'sessions' | 'system' | 'history'>('radar');
+  const [activeDetailTab, setActiveDetailTab] = useState<'radar' | 'topology' | 'sysinfo' | 'ping' | 'sessions' | 'system' | 'history'>('sysinfo');
 
   const [actions, setActions] = useState<Array<{
     id: string;
@@ -249,6 +250,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         {/* Detail Tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '2.5rem', gap: '0px', overflowX: 'auto' }}>
           {[
+            { id: 'sysinfo', label: 'Info. de Sistema' },
             { id: 'radar', label: 'Radar de Dispositivos' },
             { id: 'topology', label: 'Topología de Red' },
             { id: 'ping', label: 'Diagnóstico (Ping)' },
@@ -281,6 +283,7 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         {/* Detail Tab Content */}
         {activeDetailTab === 'radar' && <MikrotikDeviceScanner nodeId={selectedNode.id} />}
         {activeDetailTab === 'topology' && <MikrotikTopologyScanner nodeId={selectedNode.id} token={token} onImportNode={(ip, n) => { setHost(ip); setName(n); setIsModalOpen(true); }} />}
+        {activeDetailTab === 'sysinfo' && <MikrotikSystemResources nodeId={selectedNode.id} token={token} />}
         {activeDetailTab === 'ping' && <MikrotikDiagnosticTools nodeId={selectedNode.id} token={token} />}
         {activeDetailTab === 'sessions' && <MikrotikActiveSessions nodeId={selectedNode.id} token={token} />}
         {activeDetailTab === 'system' && <MikrotikSystemControl nodeId={selectedNode.id} token={token} />}
