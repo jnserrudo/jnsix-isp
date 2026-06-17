@@ -17,7 +17,7 @@ import {
   MessageSquare,
   Activity,
   MessageCircle,
-  CheckCircle, Info, AlertTriangle, Unplug
+  CheckCircle, Info, AlertTriangle, Unplug, Shuffle, Copy, Send
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { Map, MapMarker, MarkerContent } from '../components/Map';
@@ -158,6 +158,52 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [editStatus, setEditStatus] = useState<'ACTIVE' | 'SUSPENDED' | 'DELINQUENT' | 'CANCELLED'>('ACTIVE');
   const [editNotes, setEditNotes] = useState('');
   const [editFormError, setEditFormError] = useState('');
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const generateClientCode = async () => {
+    try {
+      setGeneratingCode(true);
+      const res = await fetch('/api/clients/generate-code', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEditClientCode(data.code);
+        if (editFormError) setEditFormError('');
+      }
+    } catch (e) {
+      showToast('No se pudo generar el codigo', 'warning');
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const copyClientCode = (code: string) => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }).catch(() => {
+      const el = document.createElement('textarea');
+      el.value = code;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    });
+  };
+
+  const shareCodeWhatsApp = (clientName: string, code: string, phone?: string | null) => {
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+    const msg = `Hola ${clientName}, te informamos que tu Codigo de Cliente para acceder al Portal de Autogestion es: *${code}*. Guardalo porque lo vas a necesitar para iniciar sesion y consultar tus facturas.`;
+    const url = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
   const [contractFormError, setContractFormError] = useState('');
   const [paymentFormError, setPaymentFormError] = useState('');
   const [confirmModalType, setConfirmModalType] = useState<'block' | 'unblock' | null>(null);
@@ -581,8 +627,14 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     e.preventDefault();
     setEditFormError('');
 
-    if (!editFullName || !editDni || !editAddress) {
-      setEditFormError('Nombre, DNI y Dirección son requeridos');
+    const missing: string[] = [];
+    if (!editFullName) missing.push('Nombre Completo');
+    if (!editDni) missing.push('DNI');
+    if (!editAddress) missing.push('Dirección');
+    if (!editClientCode || !editClientCode.trim()) missing.push('Código de Cliente');
+
+    if (missing.length > 0) {
+      setEditFormError(`Los siguientes campos son requeridos: ${missing.join(', ')}. El Código de Cliente permite al cliente acceder al Portal de Autogestión — usá el botón "Generar" si no tenés uno a mano.`);
       return;
     }
 
@@ -897,6 +949,82 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
             <div>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fecha Instalación:</span>
               <p style={{ fontWeight: 500 }}>{client.installationDate ? new Date(client.installationDate).toLocaleDateString() : 'Desconocida'}</p>
+            </div>
+          </div>
+
+          {/* ── Codigo de Cliente ── */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            background: 'var(--bg-secondary)', borderRadius: '10px', padding: '0.85rem 1rem',
+            border: '1px solid var(--border-color)', gap: '1rem', flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.15rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                  Codigo de Cliente
+                </span>
+              </div>
+              {client.clientCode ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontFamily: 'monospace', fontSize: '1.3rem', fontWeight: 800,
+                    letterSpacing: '0.08em', color: 'var(--accent)',
+                  }}>
+                    {client.clientCode}
+                  </span>
+                  {/* Copy button */}
+                  <button
+                    onClick={() => copyClientCode(client.clientCode!)}
+                    title={copiedCode ? 'Copiado!' : 'Copiar codigo'}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer',
+                      background: copiedCode ? 'var(--color-success)' : 'var(--accent)',
+                      color: '#fff', border: 'none', fontSize: '0.75rem', fontWeight: 600,
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    <Copy size={13} />
+                    {copiedCode ? 'Copiado!' : 'Copiar'}
+                  </button>
+                  {/* WhatsApp share button */}
+                  <button
+                    onClick={() => shareCodeWhatsApp(client.fullName, client.clientCode!, client.phone1)}
+                    title="Enviar codigo al cliente por WhatsApp"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      padding: '0.3rem 0.6rem', borderRadius: '6px', cursor: 'pointer',
+                      background: '#25D366', color: '#fff', border: 'none',
+                      fontSize: '0.75rem', fontWeight: 600,
+                    }}
+                  >
+                    <Send size={13} />
+                    Enviar al cliente
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ color: 'var(--color-warning)', fontWeight: 600, fontSize: '0.9rem' }}>Sin codigo asignado</span>
+                  {userRole !== 'READONLY' && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setEditFullName(client.fullName); setEditDni(client.dni);
+                        setEditClientCode(''); setEditPhone1(client.phone1 || '');
+                        setEditPhone2(client.phone2 || ''); setEditEmail(client.email || '');
+                        setEditAddress(client.address); setEditStatus(client.status);
+                        setIsEditModalOpen(true);
+                      }}
+                      style={{ fontSize: '0.75rem' }}
+                    >
+                      Asignar codigo
+                    </button>
+                  )}
+                </div>
+              )}
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.5 }}>
+                El cliente usa este codigo para acceder al <strong>Portal de Autogestion</strong> y consultar sus facturas. Compartilo por WhatsApp para que lo guarde.
+              </p>
             </div>
           </div>
 
@@ -1934,7 +2062,35 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>
-                    <input type="text" placeholder="Ej: CL-001" value={editClientCode} onChange={e => setEditClientCode(e.target.value)} />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className={!editClientCode && editFormError ? 'input-error' : ''}
+                        placeholder="Ej: CLI-4A2X"
+                        value={editClientCode}
+                        onChange={e => { setEditClientCode(e.target.value); if (editFormError) setEditFormError(''); }}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={generateClientCode}
+                        disabled={generatingCode}
+                        title="Generar codigo aleatorio"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          padding: '0.5rem 0.8rem', borderRadius: '8px', cursor: 'pointer',
+                          background: 'var(--accent)', color: '#fff', border: 'none',
+                          fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap',
+                          opacity: generatingCode ? 0.7 : 1,
+                        }}
+                      >
+                        <Shuffle size={14} />
+                        {generatingCode ? 'Generando...' : 'Generar'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.4 }}>
+                      El Codigo de Cliente es un identificador corto unico que el abonado usa para acceder al Portal de Autogestión y para ser identificado rapidamente. Ejemplo: <strong>CLI-4A2X</strong>
+                    </p>
                   </div>
                 </div>
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import FormAlert from '../components/FormAlert';
 import { Plus, Search, Ticket as TicketIcon } from 'lucide-react';
 
 interface Ticket {
@@ -21,6 +22,7 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modal state
@@ -60,10 +62,21 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
+
+    // Validación bloqueante antes del submit
+    const missing: string[] = [];
+    if (!formData.title || !formData.title.trim()) missing.push('Título');
+    if (!formData.description || !formData.description.trim()) missing.push('Descripción');
+    if (missing.length > 0) {
+      setFormError(`Los siguientes campos son requeridos: ${missing.join(', ')}.`);
+      return;
+    }
+
     try {
       const url = editingTicket 
-        ? `http://localhost:4000/api/tickets/${editingTicket.id}`
-        : `http://localhost:4000/api/tickets`;
+        ? `/api/tickets/${editingTicket.id}`
+        : `/api/tickets`;
       
       const method = editingTicket ? 'PUT' : 'POST';
 
@@ -76,14 +89,19 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
         body: JSON.stringify(formData)
       });
 
-      if (!res.ok) throw new Error('Error al guardar ticket');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Error al guardar el ticket');
+      }
       
+      setFormError('');
       setIsModalOpen(false);
       setEditingTicket(null);
       setFormData({ title: '', description: '', priority: 'MEDIUM', status: 'OPEN', clientId: '' });
       fetchTickets();
       (window as any).showToast('Ticket guardado correctamente', 'success');
     } catch (err: any) {
+      setFormError(err.message);
       (window as any).showToast(err.message, 'warning');
     }
   };
@@ -203,25 +221,26 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
             </div>
             
             <form onSubmit={handleSubmit} className="form-grid">
+              <div style={{ gridColumn: '1 / -1' }}>
+                <FormAlert message={formError} />
+              </div>
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Título</label>
+                <label className="form-label">Título *</label>
                 <input 
                   type="text" 
-                  className="form-control" 
+                  className={!formData.title.trim() && formError ? 'form-control input-error' : 'form-control'}
                   value={formData.title}
-                  onChange={e => setFormData({...formData, title: e.target.value})}
-                  required
+                  onChange={e => { setFormData({...formData, title: e.target.value}); if (formError) setFormError(''); }}
                 />
               </div>
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Descripción</label>
+                <label className="form-label">Descripción *</label>
                 <textarea 
-                  className="form-control" 
+                  className={!formData.description.trim() && formError ? 'form-control input-error' : 'form-control'}
                   rows={4}
                   value={formData.description}
-                  onChange={e => setFormData({...formData, description: e.target.value})}
-                  required
+                  onChange={e => { setFormData({...formData, description: e.target.value}); if (formError) setFormError(''); }}
                 />
               </div>
 

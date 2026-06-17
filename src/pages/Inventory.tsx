@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Package } from 'lucide-react';
+import FormAlert from '../components/FormAlert';
 
 interface InventoryItem {
   id: string;
@@ -29,6 +30,7 @@ const Inventory: React.FC = () => {
   const [macAddress, setMacAddress] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
+  const [formError, setFormError] = useState('');
 
   const fetchItems = async () => {
     try {
@@ -77,15 +79,24 @@ const Inventory: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingItem(null);
+    setFormError('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { name, type, status, serialNumber, macAddress, quantity, notes };
+    setFormError('');
+
+    // Validación bloqueante antes del submit
+    if (!name || !name.trim()) {
+      setFormError('El nombre del ítem es requerido.');
+      return;
+    }
+
+    const payload = { name: name.trim(), type, status, serialNumber: serialNumber.trim() || null, macAddress: macAddress.trim() || null, quantity, notes };
     const method = editingItem ? 'PUT' : 'POST';
     const url = editingItem 
-      ? `http://localhost:4000/api/inventory/${editingItem.id}` 
-      : `http://localhost:4000/api/inventory`;
+      ? `/api/inventory/${editingItem.id}` 
+      : `/api/inventory`;
 
     try {
       const res = await fetch(url, {
@@ -102,11 +113,16 @@ const Inventory: React.FC = () => {
         fetchItems();
         closeModal();
       } else {
-        (window as any).showToast('Error al guardar', 'warning');
+        const data = await res.json().catch(() => ({}));
+        const msg = data.error || 'Error al guardar el ítem';
+        setFormError(msg);
+        (window as any).showToast(msg, 'warning');
       }
     } catch (error) {
       console.error(error);
-      (window as any).showToast('Error de conexión', 'warning');
+      const msg = 'Error de conexión con el servidor';
+      setFormError(msg);
+      (window as any).showToast(msg, 'warning');
     }
   };
 
@@ -209,9 +225,15 @@ const Inventory: React.FC = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit}>
+              <FormAlert message={formError} />
               <div className="form-group">
-                <label>Nombre del Equipo/Material</label>
-                <input required type="text" className="form-control" value={name} onChange={e => setName(e.target.value)} />
+                <label>Nombre del Equipo/Material *</label>
+                <input
+                  type="text"
+                  className={!name.trim() && formError ? 'form-control input-error' : 'form-control'}
+                  value={name}
+                  onChange={e => { setName(e.target.value); if (formError) setFormError(''); }}
+                />
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div className="form-group" style={{ flex: 1 }}>
@@ -236,8 +258,17 @@ const Inventory: React.FC = () => {
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div className="form-group" style={{ flex: 1 }}>
-                  <label>S/N (Opcional)</label>
-                  <input type="text" className="form-control" value={serialNumber} onChange={e => setSerialNumber(e.target.value)} />
+                  <label>S/N (Número de Serie)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej: SN-ABC123"
+                    value={serialNumber}
+                    onChange={e => { setSerialNumber(e.target.value); if (formError) setFormError(''); }}
+                  />
+                  <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                    Si se ingresa, debe ser único en el inventario. Se usa para identificar el equipo físico.
+                  </p>
                 </div>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label>MAC (Opcional)</label>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Plus, X, RefreshCw, MoreVertical, WifiOff } from 'lucide-react';
+import { Search, Plus, X, RefreshCw, MoreVertical, WifiOff, Shuffle } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { fetchWithRetry } from '../utils/apiFetch';
 import MapPicker from '../components/MapPicker';
@@ -53,6 +53,22 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const generateClientCode = async () => {
+    try {
+      setGeneratingCode(true);
+      const res = await fetchWithRetry('/api/clients/generate-code');
+      if (res.ok) {
+        const data = await res.json();
+        setClientCode(data.code);
+        if (formError) setFormError('');
+      }
+    } catch (e) {
+      showToast('No se pudo generar el código', 'warning');
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
   const [fullName, setFullName] = useState('');
   const [dni, setDni] = useState('');
   const [phone1, setPhone1] = useState('');
@@ -66,6 +82,7 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [formError, setFormError] = useState('');
   const [configError, setConfigError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   
@@ -738,7 +755,35 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>
-                    <input type="text" placeholder="Ej: CL-001" value={clientCode} onChange={(e) => setClientCode(e.target.value)} />
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className={!clientCode && formError ? 'input-error' : ''}
+                        placeholder="Ej: CLI-4A2X"
+                        value={clientCode}
+                        onChange={(e) => { setClientCode(e.target.value); if (formError) setFormError(''); }}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={generateClientCode}
+                        disabled={generatingCode}
+                        title="Generar código aleatorio"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.35rem',
+                          padding: '0.5rem 0.8rem', borderRadius: '8px', cursor: 'pointer',
+                          background: 'var(--accent)', color: '#fff', border: 'none',
+                          fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap',
+                          opacity: generatingCode ? 0.7 : 1,
+                        }}
+                      >
+                        <Shuffle size={14} />
+                        {generatingCode ? 'Generando...' : 'Generar'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem', lineHeight: 1.4 }}>
+                      Identificador unico del abonado. Lo usara para acceder al Portal de Autogestión. Usa "Generar" para crear uno automaticamente.
+                    </p>
                   </div>
                 </div>
 
