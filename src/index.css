@@ -657,6 +657,7 @@ tr:hover td {
   background-color: transparent;
   height: 24px; /* Fixed height for consistency */
   box-sizing: border-box;
+  white-space: nowrap;
 }
 
 .badge-active {
