@@ -24,9 +24,7 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  
+      
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowUpRight, DollarSign, Percent, Save, RefreshCw, Info, AlertTriangle, CheckSquare, Square } from 'lucide-react';
-import { fetchWithRetry } from '../utils/apiFetch';
+import { ArrowUpRight, DollarSign, Percent, Save, RefreshCw, Info, AlertTriangle } from 'lucide-react';
 
 export default function PlansIncrease() {
   const [plans, setPlans] = useState<any[]>([]);
