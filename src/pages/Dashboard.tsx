@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { fetchWithRetry } from '../utils/apiFetch';
+import { useBilling } from '../contexts/BillingContext';
 import TopProgressBar from '../components/TopProgressBar';
 import {
   BarChart, Bar, XAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
@@ -52,8 +53,10 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { isBillingRunning, billingProgress, startBilling } = useBilling();
+  const [actionLoading, setActionLoading] = useState<'cuts' | null>(null);
   const [actionMessage, setActionMessage] = useState('');
+
   const [confirmAction, setConfirmAction] = useState<{
     type: 'billing' | 'cuts' | null;
     message: string;
@@ -102,12 +105,16 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   }, [token, selectedNodeId]);
 
   const triggerBilling = () => {
+    let msg = '¿Está seguro de forzar la generación de facturas mensuales hoy para TODOS los clientes del sistema?';
+    if (selectedNodeId) {
+      const nodeName = nodes.find(n => n.id === selectedNodeId)?.name || 'el Nodo Seleccionado';
+      msg = `¿Está seguro de forzar la generación de facturas EXCLUSIVAMENTE para los clientes del MikroTik: ${nodeName}?`;
+    }
     setConfirmAction({
       type: 'billing',
-      message: '¿Está seguro de forzar la generación de facturas mensuales hoy?'
+      message: msg
     });
   };
-
   const triggerCuts = () => {
     setConfirmAction({
       type: 'cuts',
@@ -115,30 +122,15 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
     });
   };
 
+  useEffect(() => {
+    const handleBillingCompleted = () => fetchStats(selectedNodeId);
+    window.addEventListener('billing-completed', handleBillingCompleted);
+    return () => window.removeEventListener('billing-completed', handleBillingCompleted);
+  }, [selectedNodeId]);
+
   const runBillingAction = async () => {
-    setActionLoading('billing');
-    setActionMessage('');
-    showToast('Generando facturas del mes...', 'info');
-    try {
-      const response = await fetch('/api/invoices/trigger-billing', {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Error al gatillar facturación');
-      setActionMessage(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`);
-      showToast(`Proceso de facturación ejecutado con éxito. Se generaron ${data.count || 0} facturas nuevas.`, 'success');
-      fetchStats(selectedNodeId);
-    } catch (err: any) {
-      const errMsg = err.message || 'Fallo de facturación manual';
-      setError(errMsg);
-      showToast(errMsg, 'warning');
-    } finally {
-      setActionLoading(null);
-    }
+    setConfirmAction({ type: null, message: '' });
+    startBilling(token, selectedNodeId || undefined);
   };
 
   const runCutsAction = async () => {
@@ -277,9 +269,40 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
               padding: '0.75rem 1rem',
               borderRadius: 'var(--radius-sm)',
               marginBottom: '1.5rem',
-              fontWeight: 500
+              fontWeight: 500,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              {actionMessage}
+              <span>{actionMessage}</span>
+              <button 
+                onClick={() => setActionMessage('')} 
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: 'inherit', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  opacity: 0.8
+                }}
+                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+
+          {billingProgress && isBillingRunning && (
+            <div style={{ marginBottom: '1.5rem', background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: 'var(--radius)', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Procesando clientes (Analizando y Facturando)...</span>
+                <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{billingProgress.percentage}% ({billingProgress.current}/{billingProgress.total})</span>
+              </div>
+              <div style={{ width: '100%', height: '8px', background: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${billingProgress.percentage}%`, height: '100%', background: 'var(--accent)', transition: 'width 0.2s ease-in-out' }}></div>
+              </div>
             </div>
           )}
 
@@ -291,16 +314,16 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                 <button 
                   className="btn btn-primary" 
                   onClick={triggerBilling}
-                  disabled={actionLoading !== null}
+                  disabled={actionLoading !== null || isBillingRunning}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                   <Play size={16} />
-                  {actionLoading === 'billing' ? 'Ejecutando...' : 'Generar Facturas del Mes'}
+                  {isBillingRunning ? 'Procesando en 2do Plano...' : 'Generar Facturas del Mes'}
                 </button>
                 <button 
                   className="btn btn-danger" 
                   onClick={triggerCuts}
-                  disabled={actionLoading !== null}
+                  disabled={actionLoading !== null || isBillingRunning}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
                   <WifiOff size={16} />
@@ -324,7 +347,6 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
               </div>
             </div>
           )}
-
           {/* KPI Cards Grid */}
           <div className={`grid ${selectedNodeId === '' ? 'grid-cols-4' : 'grid-cols-3'} kpi-grid`} style={{ marginBottom: '2rem' }}>
             <div className="card kpi-card-dashboard" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>

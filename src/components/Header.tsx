@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Menu, Bell, Check, Info, AlertTriangle, AlertCircle } from 'lucide-react';
+import { User, Menu, Bell, Check, Info, AlertTriangle, AlertCircle, Loader } from 'lucide-react';
 import { fetchWithRetry } from '../utils/apiFetch';
+import { useBilling } from '../contexts/BillingContext';
 
 interface HeaderProps {
   userName: string;
@@ -17,6 +18,7 @@ interface Notification {
 }
 
 const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
+  const { isBillingRunning, billingProgress } = useBilling();
   const currentDate = new Date().toLocaleDateString('es-ES', {
     weekday: 'long',
     year: 'numeric',
@@ -37,11 +39,9 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
           'Authorization': `Bearer ${token}`
         }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
-      }
+      const data = await res.json();
+      setNotifications(data.notifications || []);
+      setUnreadCount(data.unreadCount || 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
     }
@@ -49,10 +49,11 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every minute
+    const interval = setInterval(fetchNotifications, 60000); // 1 min poll
     return () => clearInterval(interval);
   }, []);
 
+  // Close dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -68,27 +69,22 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
       const token = localStorage.getItem('token');
       await fetchWithRetry(`http://localhost:4000/api/notifications/${id}/read`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchNotifications();
     } catch (err) {
-      console.error('Error marking as read:', err);
+      console.error('Error marking notification as read:', err);
     }
   };
 
   const markAllAsRead = async () => {
     try {
       const token = localStorage.getItem('token');
-      await fetchWithRetry(`http://localhost:4000/api/notifications/read-all`, {
+      await fetchWithRetry('http://localhost:4000/api/notifications/read-all', {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       fetchNotifications();
-      setShowDropdown(false);
     } catch (err) {
       console.error('Error marking all as read:', err);
     }
@@ -104,7 +100,6 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
 
   return (
     <header className="app-header">
-      {/* Menu button & Date */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
         <button 
           onClick={onToggleSidebar}
@@ -121,13 +116,18 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
         </span>
       </div>
 
-      {/* User Info Block */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '1rem'
       }}>
-        {/* Notifications */}
+        {isBillingRunning && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--color-warning-bg, #fffbeb)', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-sm, 0.375rem)', border: '1px solid var(--warning-color, #f59e0b)', color: 'var(--warning-color, #f59e0b)', fontSize: '0.85rem', fontWeight: 600 }}>
+            <Loader size={14} className="animate-spin" />
+            <span>Facturando: {billingProgress?.percentage || 0}%</span>
+          </div>
+        )}
+
         <div style={{ position: 'relative' }} ref={dropdownRef}>
           <button 
             className="btn btn-secondary"
@@ -271,7 +271,6 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
           )}
         </div>
 
-        {/* User profile */}
         <div style={{
           display: 'flex',
           alignItems: 'center',

@@ -1,3 +1,4 @@
+import { BillingProvider } from './contexts/BillingContext';
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 
@@ -12,6 +13,8 @@ import MikrotikTest from './pages/MikrotikTest';
 import MikrotikManagementCenter from './pages/MikrotikManagementCenter';
 import MigrationWizard from './pages/MigrationWizard';
 import Plans from './pages/Plans';
+import PlansIncrease from './pages/PlansIncrease';
+import Settings from './pages/Settings';
 import Audit from './pages/Audit';
 import Inventory from './pages/Inventory';
 import Tickets from './pages/Tickets';
@@ -80,43 +83,45 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   if (user.isClient) return <Navigate to="/portal" replace />;
   
   return (
-    <div className="app-container">
-      <Sidebar 
-        onLogout={handleLogout} 
-        userRole={user.role} 
-        isOpen={isSidebarOpen} 
-        onClose={() => setIsSidebarOpen(false)} 
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={handleToggleSidebarCollapse}
-      />
-      <div className="main-content">
-        <Header 
-          userName={user.fullName} 
-          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+    <BillingProvider>
+      <div className="app-container">
+        <Sidebar 
+          onLogout={handleLogout} 
+          userRole={user.role} 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)} 
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebarCollapse}
         />
-        <Routes>
-          <Route path="/" element={<Dashboard token={token} userRole={user.role} />} />
-          <Route path="/clients" element={<Clients token={token} userRole={user.role} />} />
-          <Route path="/clients/:id" element={<ClientDetail token={token} userRole={user.role} />} />
-          <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
-          <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
-          <Route path="/mikrotik-test" element={<MikrotikTest />} />
-          <Route path="/mikrotik-management" element={
-            user.role === 'ADMIN' || user.role === 'OPERATOR' ? <MikrotikManagementCenter /> : <Navigate to="/" replace />
-          } />
-          <Route path="/migration-wizard" element={
-            user.role === 'ADMIN' ? <MigrationWizard /> : <Navigate to="/" replace />
-          } />
-          <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
-          <Route path="/audit" element={
-            user.role === 'ADMIN' ? <Audit token={token} userRole={user.role} /> : <Navigate to="/" replace />
-          } />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/tickets" element={<Tickets token={token} userRole={user.role} />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <div className="main-content">
+          <Header 
+            userName={user.fullName} 
+            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
+          />
+          <Routes>
+            <Route path="/" element={<Dashboard token={token} userRole={user.role} />} />
+            <Route path="/clients" element={<Clients token={token} userRole={user.role} />} />
+            <Route path="/clients/:id" element={<ClientDetail token={token} userRole={user.role} />} />
+            <Route path="/inventory" element={<Inventory />} />
+            <Route path="/tickets" element={<Tickets token={token} userRole={user.role} />} />
+            <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
+            {user.role === 'ADMIN' && (
+              <>
+                <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
+                <Route path="/mikrotik-test" element={<MikrotikTest />} />
+                <Route path="/mikrotik" element={<MikrotikManagementCenter />} />
+                <Route path="/migration" element={<MigrationWizard />} />
+                <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
+                <Route path="/plans-increase" element={<PlansIncrease />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/audit" element={<Audit token={token} userRole={user.role} />} />
+              </>
+            )}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </div>
-    </div>
+    </BillingProvider>
   );
 };
 

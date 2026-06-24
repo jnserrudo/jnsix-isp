@@ -1420,3 +1420,11 @@ input::placeholder, textarea::placeholder {
     white-space: nowrap;
   }
 }
+
+input[type="checkbox"], input[type="radio"] {
+  width: auto !important;
+  padding: 0 !important;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
