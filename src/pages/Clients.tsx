@@ -57,7 +57,9 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const generateClientCode = async () => {
     try {
       setGeneratingCode(true);
-      const res = await fetchWithRetry('/api/clients/generate-code');
+      const res = await fetchWithRetry('/api/clients/generate-code', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setClientCode(data.code);
