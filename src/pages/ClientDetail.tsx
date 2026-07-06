@@ -18,7 +18,7 @@ import {
   MessageSquare,
   Activity,
   MessageCircle,
-  CheckCircle, Info, AlertTriangle, Unplug, Shuffle, Copy, Send, ShieldCheck
+  CheckCircle, Info, AlertTriangle, Unplug, Shuffle, Copy, Send, ShieldCheck, Edit, Trash2
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { Map, MapMarker, MarkerContent } from '../components/Map';
@@ -168,6 +168,30 @@ const getClientDetailedStatus = (client: any) => {
   }
 };
 
+const getDiffDescription = (oldPay: any, newPay: any) => {
+  if (!oldPay || !newPay) return '';
+  const diffs: string[] = [];
+  if (Number(oldPay.amount) !== Number(newPay.amount)) {
+    diffs.push(`Monto: $${Number(oldPay.amount).toLocaleString()} por $${Number(newPay.amount).toLocaleString()}`);
+  }
+  if (oldPay.paymentMethod !== newPay.paymentMethod) {
+    const getMethodLabel = (m: string) => m === 'TRANSFER' ? 'Transferencia' : m === 'MERCADO_PAGO' ? 'Mercado Pago' : m === 'CASH' ? 'Efectivo' : m;
+    diffs.push(`Método: ${getMethodLabel(oldPay.paymentMethod)} por ${getMethodLabel(newPay.paymentMethod)}`);
+  }
+  const oldDate = new Date(oldPay.paymentDate).toLocaleDateString();
+  const newDate = new Date(newPay.paymentDate).toLocaleDateString();
+  if (oldDate !== newDate) {
+    diffs.push(`Fecha: ${oldDate} por ${newDate}`);
+  }
+  if ((oldPay.reference || '') !== (newPay.reference || '')) {
+    diffs.push(`Ref: "${oldPay.reference || 'Ninguna'}" por "${newPay.reference || 'Ninguna'}"`);
+  }
+  if ((oldPay.notes || '') !== (newPay.notes || '')) {
+    diffs.push(`Notas: "${oldPay.notes || 'Ninguna'}" por "${newPay.notes || 'Ninguna'}"`);
+  }
+  return diffs.length > 0 ? `Cambios: ${diffs.join(', ')}` : 'Sin cambios en campos principales';
+};
+
 const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -189,6 +213,35 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [payNotes, setPayNotes] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFullName, setEditFullName] = useState('');
+
+  // Payment Annulment / Rectification / Invoice Edit Modal States
+  const [isVoidPaymentModalOpen, setIsVoidPaymentModalOpen] = useState(false);
+  const [selectedPaymentForVoid, setSelectedPaymentForVoid] = useState<any | null>(null);
+  const [voidReason, setVoidReason] = useState('ERROR_TIPEO');
+  const [voidNotes, setVoidNotes] = useState('');
+
+  const [isRectifyPaymentModalOpen, setIsRectifyPaymentModalOpen] = useState(false);
+  const [selectedPaymentForRectify, setSelectedPaymentForRectify] = useState<any | null>(null);
+  const [rectifyAmount, setRectifyAmount] = useState('');
+  const [rectifyMethod, setRectifyMethod] = useState('TRANSFER');
+  const [rectifyDate, setRectifyDate] = useState('');
+  const [rectifyReference, setRectifyReference] = useState('');
+  const [rectifyNotes, setRectifyNotes] = useState('');
+  const [rectifyInvoiceId, setRectifyInvoiceId] = useState('');
+  const [rectifyReason, setRectifyReason] = useState('ERROR_TIPEO');
+  const [rectifyObservaciones, setRectifyObservaciones] = useState('');
+
+  const [isEditInvoiceModalOpen, setIsEditInvoiceModalOpen] = useState(false);
+  const [selectedInvoiceForEdit, setSelectedInvoiceForEdit] = useState<any | null>(null);
+  const [editInvoiceDueDate, setEditInvoiceDueDate] = useState('');
+  const [editInvoiceGraceDays, setEditInvoiceGraceDays] = useState('3');
+  const [editInvoiceNotes, setEditInvoiceNotes] = useState('');
+  const [editInvoiceReason, setEditInvoiceReason] = useState('ERROR_TIPEO');
+  const [editInvoiceObservaciones, setEditInvoiceObservaciones] = useState('');
+  const [editInvoiceItems, setEditInvoiceItems] = useState<any[]>([]);
+  const [newItemDescription, setNewItemDescription] = useState('');
+  const [newItemAmount, setNewItemAmount] = useState('');
+  const [newItemType, setNewItemType] = useState('ADJUSTMENT');
 
   // Edit client form fields
   const [editDni, setEditDni] = useState('');
@@ -547,6 +600,182 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleVoidPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPaymentForVoid) return;
+    if (!voidReason) {
+      showToast('Debe ingresar un motivo para anular el cobro.', 'warning');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/payments/${selectedPaymentForVoid.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reason: voidReason,
+          observaciones: voidNotes
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al anular pago');
+      }
+      showToast('Pago anulado con éxito', 'success');
+      await fetchClientData(0, true);
+      setIsVoidPaymentModalOpen(false);
+      setSelectedPaymentForVoid(null);
+      setVoidNotes('');
+    } catch (err: any) {
+      showToast(err.message, 'warning');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRectifyPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPaymentForRectify) return;
+    if (!rectifyReason) {
+      showToast('Debe ingresar un motivo para rectificar el cobro.', 'warning');
+      return;
+    }
+    if (!rectifyAmount || parseFloat(rectifyAmount) <= 0) {
+      showToast('Debe ingresar un monto válido.', 'warning');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/payments/${selectedPaymentForRectify.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: parseFloat(rectifyAmount),
+          paymentMethod: rectifyMethod,
+          paymentDate: rectifyDate,
+          reference: rectifyReference || null,
+          notes: rectifyNotes || null,
+          reason: rectifyReason,
+          observaciones: rectifyObservaciones
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al rectificar pago');
+      }
+      showToast('Pago rectificado con éxito. Se generó un nuevo registro de reemplazo.', 'success');
+      await fetchClientData(0, true);
+      setIsRectifyPaymentModalOpen(false);
+      setSelectedPaymentForRectify(null);
+      setRectifyObservaciones('');
+    } catch (err: any) {
+      showToast(err.message, 'warning');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForEdit) return;
+    if (!editInvoiceReason) {
+      showToast('Debe ingresar un motivo para modificar la factura.', 'warning');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/invoices/${selectedInvoiceForEdit.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dueDate: editInvoiceDueDate,
+          graceDays: parseInt(editInvoiceGraceDays),
+          notes: editInvoiceNotes || null,
+          reason: editInvoiceReason,
+          observaciones: editInvoiceObservaciones
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al editar factura');
+      }
+      showToast('Factura modificada con éxito', 'success');
+      await fetchClientData(0, true);
+      setIsEditInvoiceModalOpen(false);
+      setSelectedInvoiceForEdit(null);
+      setEditInvoiceObservaciones('');
+    } catch (err: any) {
+      showToast(err.message, 'warning');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAddInvoiceItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForEdit) return;
+    if (!newItemDescription || !newItemAmount) {
+      showToast('Complete la descripción y monto del concepto.', 'warning');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/invoices/${selectedInvoiceForEdit.id}/items`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: newItemDescription,
+          amount: parseFloat(newItemAmount),
+          type: newItemType
+        })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al agregar concepto');
+      }
+      showToast('Concepto agregado', 'success');
+      setNewItemDescription('');
+      setNewItemAmount('');
+      
+      const dataJson = await res.json();
+      setEditInvoiceItems(prev => [...prev, dataJson.item]);
+      
+      await fetchClientData(0, true);
+    } catch (err: any) {
+      showToast(err.message, 'warning');
+    }
+  };
+
+  const handleDeleteInvoiceItem = async (itemId: string) => {
+    if (!selectedInvoiceForEdit) return;
+    try {
+      const res = await fetch(`/api/invoices/${selectedInvoiceForEdit.id}/items/${itemId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Error al eliminar concepto');
+      }
+      showToast('Concepto eliminado', 'success');
+      setEditInvoiceItems(prev => prev.filter(item => item.id !== itemId));
+      await fetchClientData(0, true);
+    } catch (err: any) {
+      showToast(err.message, 'warning');
     }
   };
 
@@ -1835,6 +2064,24 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                     >
                       WhatsApp
                     </button>
+                    {userRole !== 'READONLY' && (
+                      <button 
+                        className="btn btn-secondary btn-sm" 
+                        style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                        onClick={() => {
+                          setSelectedInvoiceForEdit(invoice);
+                          setEditInvoiceDueDate(new Date(invoice.dueDate).toISOString().split('T')[0]);
+                          setEditInvoiceGraceDays(invoice.contract?.graceDays?.toString() || '3');
+                          setEditInvoiceNotes(invoice.notes || '');
+                          setEditInvoiceReason('ERROR_TIPEO');
+                          setEditInvoiceObservaciones('');
+                          setEditInvoiceItems(invoice.items || []);
+                          setIsEditInvoiceModalOpen(true);
+                        }}
+                      >
+                        Modificar Factura
+                      </button>
+                    )}
                     {invoice.status !== 'PAID' && (
                       <>
                         {(invoice.status === 'PENDING' || invoice.status === 'PARTIAL') && (
@@ -1891,28 +2138,136 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {client.payments.map((pay) => (
-                <div key={pay.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px' }}>
-                  <div>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--color-success)', display: 'block' }}>
-                      Pago registrado • {new Date(pay.paymentDate).toLocaleDateString()}
-                    </span>
-                    {(pay.reference || pay.notes) && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                        {pay.reference && <div style={{ marginBottom: '0.1rem' }}><strong style={{ color: '#aaa' }}>Ref/Comprobante:</strong> {pay.reference}</div>}
-                        {pay.notes && <div><strong style={{ color: '#aaa' }}>Notas:</strong> {pay.notes}</div>}
+              {client.payments.map((pay) => {
+                const isVoided = pay.deletedAt !== null;
+                const isReplacement = client.payments.find(p => p.replacedById === pay.id);
+
+                const getReasonLabelLocal = (reason: string) => {
+                  switch (reason) {
+                    case 'ERROR_TIPEO': return 'Error de Tipeo';
+                    case 'ANULACION': return 'Anulación';
+                    case 'EDICION_MONTO': return 'Edición de Monto';
+                    case 'OTRO': return 'Otro';
+                    default: return reason;
+                  }
+                };
+
+                return (
+                  <div 
+                    key={pay.id} 
+                    style={{ 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      gap: '0.5rem',
+                      padding: '0.75rem', 
+                      backgroundColor: isVoided ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', 
+                      borderRadius: '6px',
+                      border: isVoided ? '1px dashed var(--border-color)' : '1px solid transparent',
+                      opacity: isVoided ? 0.6 : 1
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isVoided ? 'var(--text-muted)' : 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          Pago registrado • {new Date(pay.paymentDate).toLocaleDateString()}
+                          {isVoided && (
+                            <span className="badge badge-delinquent" style={{ fontSize: '0.65rem', padding: '0.1rem 0.3rem' }}>
+                              {pay.replacedById ? 'RECTIFICADO' : 'ANULADO'}
+                            </span>
+                          )}
+                          {!isVoided && isReplacement && (
+                            <span className="badge badge-active" style={{ fontSize: '0.65rem', padding: '0.1rem 0.3rem', backgroundColor: 'var(--color-success)', color: '#fff' }}>
+                              CORREGIDO
+                            </span>
+                          )}
+                        </span>
+                        
+                        {/* Info details */}
+                        {(pay.reference || pay.notes) && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                            {pay.reference && <div style={{ marginBottom: '0.1rem' }}><strong style={{ color: '#aaa' }}>Ref/Comprobante:</strong> {pay.reference}</div>}
+                            {pay.notes && <div><strong style={{ color: '#aaa' }}>Notas:</strong> {pay.notes}</div>}
+                          </div>
+                        )}
+
+                        {/* Audit Details for Voided or Replaced Payments */}
+                        {isVoided && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', padding: '0.3rem', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
+                            <div><strong style={{ color: '#ccc' }}>Motivo:</strong> {getReasonLabelLocal(pay.voidReason)}</div>
+                            {pay.voidNotes && <div><strong style={{ color: '#ccc' }}>Observaciones:</strong> {pay.voidNotes}</div>}
+                            {pay.replacedBy && (
+                              <div style={{ color: 'var(--color-success)', marginTop: '0.1rem' }}>
+                                - Reemplazado por nuevo cobro de ${Number(pay.replacedBy.amount).toLocaleString()} (N° Factura: {pay.replacedBy.invoice?.invoiceNumber})
+                                <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                                  {getDiffDescription(pay, pay.replacedBy)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Link to Predecessor if this is a Correction */}
+                        {!isVoided && isReplacement && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.3rem', padding: '0.3rem', backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '4px' }}>
+                            <span style={{ color: 'var(--accent)' }}>
+                              Corrige cobro anterior anulado de ${Number(isReplacement.amount).toLocaleString()} (Motivo: {getReasonLabelLocal(isReplacement.voidReason)})
+                              <div style={{ fontSize: '0.7rem', color: '#888', marginTop: '0.15rem', fontStyle: 'italic' }}>
+                                {getDiffDescription(isReplacement, pay)}
+                              </div>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontWeight: 700, color: isVoided ? 'var(--text-muted)' : 'var(--color-success)', textDecoration: isVoided ? 'line-through' : 'none' }}>
+                          + ${Number(pay.amount).toLocaleString()}
+                        </span>
+                        <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {pay.paymentMethod === 'TRANSFER' ? 'Transferencia' : 
+                           pay.paymentMethod === 'MERCADO_PAGO' ? 'Mercado Pago' : 'Efectivo'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons for active payments */}
+                    {!isVoided && userRole !== 'READONLY' && (
+                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', marginTop: '0.25rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.25rem' }}>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setSelectedPaymentForRectify(pay);
+                            setRectifyAmount(pay.amount.toString());
+                            setRectifyMethod(pay.paymentMethod);
+                            setRectifyDate(pay.paymentDate.split('T')[0]);
+                            setRectifyReference(pay.reference || '');
+                            setRectifyNotes(pay.notes || '');
+                            setRectifyInvoiceId(pay.invoiceId);
+                            setRectifyReason('ERROR_TIPEO');
+                            setRectifyObservaciones('');
+                            setIsRectifyPaymentModalOpen(true);
+                          }}
+                          style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: 'var(--accent)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                        >
+                          <Edit size={10} /> Rectificar
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => {
+                            setSelectedPaymentForVoid(pay);
+                            setVoidReason('ANULACION');
+                            setVoidNotes('');
+                            setIsVoidPaymentModalOpen(true);
+                          }}
+                          style={{ fontSize: '0.7rem', padding: '0.15rem 0.4rem', borderColor: 'var(--color-danger)', color: 'var(--color-danger)', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                        >
+                          <Trash2 size={10} /> Anular
+                        </button>
                       </div>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span style={{ fontWeight: 700, color: 'var(--color-success)' }}>+ ${Number(pay.amount).toLocaleString()}</span>
-                    <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {pay.paymentMethod === 'TRANSFER' ? 'Transferencia' : 
-                       pay.paymentMethod === 'MERCADO_PAGO' ? 'Mercado Pago' : 'Efectivo'}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -2607,6 +2962,371 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
             <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
               <button type="button" className="btn btn-primary" onClick={() => setIsSyncInfoModalOpen(false)}>Entendido</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Anular Pago */}
+      {isVoidPaymentModalOpen && selectedPaymentForVoid && (
+        <div className="modal-backdrop" onClick={() => { setIsVoidPaymentModalOpen(false); setSelectedPaymentForVoid(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <button type="button" className="modal-close-btn" onClick={() => { setIsVoidPaymentModalOpen(false); setSelectedPaymentForVoid(null); }} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertTriangle size={20} color="var(--color-danger)" /> Confirmar Anulación de Pago
+            </h3>
+            
+            <form onSubmit={handleVoidPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div className="modal-body">
+                {/* Impact analysis */}
+                <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--color-danger)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.82rem', color: '#ffb3b3', marginBottom: '1rem' }}>
+                  <strong style={{ display: 'block', marginBottom: '0.25rem' }}>ANÁLISIS DE IMPACTO COMERCIAL Y TÉCNICO:</strong>
+                  - Se anulará el cobro de <strong>${Number(selectedPaymentForVoid.amount).toLocaleString()} ARS</strong>.<br />
+                  - La factura correspondiente aumentará su saldo pendiente en <strong>${Number(selectedPaymentForVoid.amount).toLocaleString()} ARS</strong>.<br />
+                  - Si la factura queda con deuda vencida, el estado del cliente cambiará a <strong>Moroso</strong> y el sistema advertirá para suspender su servicio en MikroTik.
+                </div>
+
+                <div className="form-group">
+                  <label>Motivo de Auditoría *</label>
+                  <select
+                    className="form-control"
+                    value={voidReason}
+                    onChange={(e) => setVoidReason(e.target.value)}
+                    required
+                  >
+                    <option value="ERROR_TIPEO">Error de tipeo</option>
+                    <option value="ANULACION">Anulación</option>
+                    <option value="EDICION_MONTO">Edición de monto</option>
+                    <option value="OTRO">Otro (especificar abajo)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Observaciones / Aclaración *</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    placeholder="Escriba la justificación detallada..."
+                    value={voidNotes}
+                    onChange={(e) => setVoidNotes(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => { setIsVoidPaymentModalOpen(false); setSelectedPaymentForVoid(null); }} disabled={submitting}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-danger" disabled={submitting}>
+                  {submitting ? 'Anulando...' : 'Confirmar Anulación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Rectificar Pago */}
+      {isRectifyPaymentModalOpen && selectedPaymentForRectify && (
+        <div className="modal-backdrop" onClick={() => { setIsRectifyPaymentModalOpen(false); setSelectedPaymentForRectify(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <button type="button" className="modal-close-btn" onClick={() => { setIsRectifyPaymentModalOpen(false); setSelectedPaymentForRectify(null); }} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Edit size={20} color="var(--accent)" /> Rectificar Cobro Manual
+            </h3>
+            
+            <form onSubmit={handleRectifyPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                
+                {/* Impact analysis */}
+                <div style={{ backgroundColor: 'rgba(230, 92, 0, 0.1)', border: '1px solid var(--accent)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.82rem', color: '#ffcc99', marginBottom: '1rem' }}>
+                  <strong style={{ display: 'block', marginBottom: '0.25rem' }}>ANÁLISIS DE IMPACTO DE RECTIFICACIÓN:</strong>
+                  - El cobro original de <strong>${Number(selectedPaymentForRectify.amount).toLocaleString()} ARS</strong> se marcará como deshabilitado/anulado.<br />
+                  - Se registrará un nuevo cobro por <strong>${Number(rectifyAmount || 0).toLocaleString()} ARS</strong> asignado a este cliente.<br />
+                  - Los saldos de las facturas se recalcularán de forma automática.
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Monto Corregido ($ ARS) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      value={rectifyAmount}
+                      onChange={(e) => setRectifyAmount(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Canal/Método *</label>
+                    <select
+                      className="form-control"
+                      value={rectifyMethod}
+                      onChange={(e) => setRectifyMethod(e.target.value)}
+                    >
+                      <option value="TRANSFER">Transferencia</option>
+                      <option value="MERCADO_PAGO">Mercado Pago</option>
+                      <option value="CASH">Efectivo</option>
+                      <option value="OTHER">Otro</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Fecha de Pago *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={rectifyDate}
+                      onChange={(e) => setRectifyDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Referencia/N° Comp.</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={rectifyReference}
+                      onChange={(e) => setRectifyReference(e.target.value)}
+                      placeholder="Ej. N° de transferencia"
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Asignar a Factura</label>
+                  <select
+                    className="form-control"
+                    value={rectifyInvoiceId}
+                    onChange={(e) => setRectifyInvoiceId(e.target.value)}
+                  >
+                    {client.invoices?.map(inv => (
+                      <option key={inv.id} value={inv.id}>
+                        Factura N° {inv.invoiceNumber} - Período: {new Date(inv.periodStart).toLocaleDateString(undefined, {month: 'long', year: 'numeric'}).toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Notas de Cobro (Aparecen en ficha)</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={rectifyNotes}
+                    onChange={(e) => setRectifyNotes(e.target.value)}
+                    placeholder="Notas internas del cobro..."
+                  />
+                </div>
+
+                <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem' }}>
+                  <label>Motivo de Rectificación (Auditoría) *</label>
+                  <select
+                    className="form-control"
+                    value={rectifyReason}
+                    onChange={(e) => setRectifyReason(e.target.value)}
+                    required
+                  >
+                    <option value="ERROR_TIPEO">Error de tipeo</option>
+                    <option value="EDICION_MONTO">Edición de monto</option>
+                    <option value="OTRO">Otro (especificar abajo)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Aclaraciones / Observaciones de Rectificación *</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    placeholder="Justifique el motivo de este cambio..."
+                    value={rectifyObservaciones}
+                    onChange={(e) => setRectifyObservaciones(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => { setIsRectifyPaymentModalOpen(false); setSelectedPaymentForRectify(null); }} disabled={submitting}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Procesando...' : 'Aplicar Rectificación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Modificar Factura (Plazos y Conceptos) */}
+      {isEditInvoiceModalOpen && selectedInvoiceForEdit && (
+        <div className="modal-backdrop" onClick={() => { setIsEditInvoiceModalOpen(false); setSelectedInvoiceForEdit(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <button type="button" className="modal-close-btn" onClick={() => { setIsEditInvoiceModalOpen(false); setSelectedInvoiceForEdit(null); }} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <FileText size={20} color="var(--accent)" /> Modificar Factura N° {selectedInvoiceForEdit.invoiceNumber}
+            </h3>
+
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              {/* Dynamic items management section */}
+              <div style={{ marginBottom: '1.5rem', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '6px' }}>
+                <strong style={{ fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Gestión de Ítems / Conceptos Facturados</strong>
+                
+                {/* Current Items List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                  {editInvoiceItems.map(item => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.4rem 0.6rem', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '4px', fontSize: '0.8rem' }}>
+                      <div>
+                        <span>{item.description}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>Tipo: {item.type}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontWeight: 600 }}>${Number(item.amount).toLocaleString()}</span>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleDeleteInvoiceItem(item.id)}
+                          style={{ padding: '0.1rem 0.3rem', borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new Item Form */}
+                <form onSubmit={handleAddInvoiceItem} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'end' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.7rem' }}>Descripción</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '0.3rem' }}
+                      value={newItemDescription}
+                      onChange={(e) => setNewItemDescription(e.target.value)}
+                      placeholder="Concepto..."
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.7rem' }}>Monto ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '0.3rem' }}
+                      value={newItemAmount}
+                      onChange={(e) => setNewItemAmount(e.target.value)}
+                      placeholder="Monto"
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.7rem' }}>Tipo</label>
+                    <select
+                      className="form-control"
+                      style={{ fontSize: '0.8rem', padding: '0.3rem' }}
+                      value={newItemType}
+                      onChange={(e) => setNewItemType(e.target.value)}
+                    >
+                      <option value="BASE">Abono Base</option>
+                      <option value="MORA">Mora/Interés</option>
+                      <option value="ADJUSTMENT">Ajuste/Descuento</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    style={{ padding: '0.35rem 0.6rem' }}
+                  >
+                    + Agregar
+                  </button>
+                </form>
+              </div>
+
+              {/* Plazos Form */}
+              <form onSubmit={handleEditInvoice}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label>Fecha de Vencimiento *</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={editInvoiceDueDate}
+                      onChange={(e) => setEditInvoiceDueDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Días de Gracia del Contrato *</label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      value={editInvoiceGraceDays}
+                      onChange={(e) => setEditInvoiceGraceDays(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Notas de Factura (Internas)</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={editInvoiceNotes}
+                    onChange={(e) => setEditInvoiceNotes(e.target.value)}
+                    placeholder="Notas internas..."
+                  />
+                </div>
+
+                <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginTop: '1rem' }}>
+                  <label>Motivo del Ajuste (Auditoría) *</label>
+                  <select
+                    className="form-control"
+                    value={editInvoiceReason}
+                    onChange={(e) => setEditInvoiceReason(e.target.value)}
+                    required
+                  >
+                    <option value="ERROR_TIPEO">Error de tipeo</option>
+                    <option value="EDICION_MONTO">Edición de monto</option>
+                    <option value="ANULACION">Anulación comercial</option>
+                    <option value="OTRO">Otro (especificar abajo)</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Aclaraciones / Observaciones de Auditoría *</label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    placeholder="Justificación detallada..."
+                    value={editInvoiceObservaciones}
+                    onChange={(e) => setEditInvoiceObservaciones(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="modal-footer" style={{ padding: '1rem 0 0 0', borderTop: '1px solid var(--border-color)' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setIsEditInvoiceModalOpen(false); setSelectedInvoiceForEdit(null); }} disabled={submitting}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? 'Guardando...' : 'Aplicar Modificaciones'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

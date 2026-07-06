@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
+  FileText, 
   Users, 
   CreditCard, 
   Network, 
@@ -38,6 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLogout, userRole, isOpen, onClose, 
     { path: '/plans', label: 'Planes de Internet', icon: Layers, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
     { path: '/plans/increase', label: 'Aumentos Masivos', icon: Percent, roles: ['ADMIN'] },
     { path: '/billing', label: 'Facturación y Pagos', icon: CreditCard, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
+    { path: '/rectifications', label: 'Rectificaciones', icon: FileText, roles: ['ADMIN', 'OPERATOR'] },
     { path: '/nodes', label: 'Equipos MikroTik', icon: Network, roles: ['ADMIN', 'OPERATOR', 'READONLY'] },
     { path: '/mikrotik-management', label: 'Centro Gestión MikroTik', icon: Sliders, roles: ['ADMIN', 'OPERATOR'] },
     { path: '/migration-wizard', label: 'Asistente de Migración', icon: Shuffle, roles: ['ADMIN'] },

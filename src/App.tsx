@@ -19,6 +19,7 @@ import Audit from './pages/Audit';
 import Inventory from './pages/Inventory';
 import Tickets from './pages/Tickets';
 import PortalDashboard from './pages/PortalDashboard';
+import Rectifications from './pages/Rectifications';
 
 
 // Components
@@ -105,6 +106,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/tickets" element={<Tickets token={token} userRole={user.role} />} />
             <Route path="/billing" element={<Billing token={token} userRole={user.role} />} />
+            <Route path="/rectifications" element={<Rectifications token={token} />} />
             {user.role === 'ADMIN' && (
               <>
                 <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
