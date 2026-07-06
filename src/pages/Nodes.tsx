@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Radio, Check, X, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Plus, Radio, Check, X, RefreshCw, AlertCircle, ArrowLeft, Pencil, WifiOff } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import MikrotikDeviceScanner from '../components/MikrotikDeviceScanner';
 import MikrotikTopologyScanner from '../components/mikrotik/MikrotikTopologyScanner';
@@ -69,6 +69,11 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editingNode, setEditingNode] = useState<Node | null>(null);
+
+  // Cuts modal state for per-node execution
+  const [cutsModal, setCutsModal] = useState<{ node: Node } | null>(null);
+  const [cutsLoading, setCutsLoading] = useState(false);
 
   const fetchNodes = async () => {
     try {
@@ -114,58 +119,127 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
     }
   }, [token, activeMainTab, activeDetailTab, selectedNode]);
 
+  const resetForm = () => {
+    setName('');
+    setHost('');
+    setPort('8728');
+    setUser('');
+    setPass('');
+    setOltHost('');
+    setOltType('NONE');
+    setNotes('');
+    setFormError('');
+    setEditingNode(null);
+  };
+
+  const handleOpenEdit = (node: Node) => {
+    setEditingNode(node);
+    setName(node.name);
+    setHost(node.mikrotikHost);
+    setPort(String(node.mikrotikPort));
+    setUser(node.mikrotikUser);
+    setPass('');
+    setOltHost(node.oltHost || '');
+    setOltType(node.oltType || 'NONE');
+    setNotes('');
+    setFormError('');
+    setIsModalOpen(true);
+  };
+
   const handleCreateNode = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
-    if (!name || !host || !user || !pass) {
-      setFormError('Nombre, IP Host, Usuario y Contraseña son requeridos');
+    if (!name || !host || !user) {
+      setFormError('Nombre, IP Host y Usuario son requeridos');
+      return;
+    }
+
+    if (!editingNode && !pass) {
+      setFormError('La contraseña es requerida al crear un nodo');
       return;
     }
 
     setSubmitting(true);
-    showToast('Añadiendo nodo de red...', 'info');
-    try {
-      const response = await fetch('/api/nodes', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+
+    if (editingNode) {
+      // EDIT MODE
+      showToast('Actualizando nodo de red...', 'info');
+      try {
+        const body: any = {
           name,
           mikrotikHost: host,
           mikrotikPort: parseInt(port),
           mikrotikUser: user,
-          mikrotikPassword: pass,
           oltHost: oltHost || null,
           oltType,
           notes
-        })
-      });
+        };
+        if (pass) body.mikrotikPassword = pass;
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al guardar nodo');
+        const response = await fetch(`/api/nodes/${editingNode.id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Error al actualizar nodo');
+        }
+
+        showToast('Nodo actualizado con éxito', 'success');
+        setIsModalOpen(false);
+        resetForm();
+        fetchNodes();
+      } catch (err: any) {
+        const errMsg = err.message || 'Error actualizando nodo';
+        setFormError(errMsg);
+        showToast(errMsg, 'warning');
+      } finally {
+        setSubmitting(false);
       }
+    } else {
+      // CREATE MODE
+      showToast('Añadiendo nodo de red...', 'info');
+      try {
+        const response = await fetch('/api/nodes', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            mikrotikHost: host,
+            mikrotikPort: parseInt(port),
+            mikrotikUser: user,
+            mikrotikPassword: pass,
+            oltHost: oltHost || null,
+            oltType,
+            notes
+          })
+        });
 
-      showToast('Nodo de red creado con éxito', 'success');
-      setIsModalOpen(false);
-      setName('');
-      setHost('');
-      setPort('8728');
-      setUser('');
-      setPass('');
-      setOltHost('');
-      setOltType('NONE');
-      setNotes('');
-      fetchNodes();
-    } catch (err: any) {
-      const errMsg = err.message || 'Error guardando nodo';
-      setFormError(errMsg);
-      showToast(errMsg, 'warning');
-    } finally {
-      setSubmitting(false);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Error al guardar nodo');
+        }
+
+        showToast('Nodo de red creado con éxito', 'success');
+        setIsModalOpen(false);
+        resetForm();
+        fetchNodes();
+      } catch (err: any) {
+        const errMsg = err.message || 'Error guardando nodo';
+        setFormError(errMsg);
+        showToast(errMsg, 'warning');
+      } finally {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -188,6 +262,36 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
     } catch (err) {
       setTestStatus(prev => ({ ...prev, [nodeId]: 'offline' }));
       showToast('Fallo al conectar con el Nodo de red', 'warning');
+    }
+  };
+
+  const runNodeCuts = async (node: Node) => {
+    setCutsLoading(true);
+    showToast(`Ejecutando cortes para ${node.name}...`, 'info');
+    try {
+      const response = await fetch('/api/invoices/trigger-cuts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ nodeId: node.id })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Error al ejecutar cortes');
+      const cuts = data.cutsExecuted || 0;
+      const failures = data.errors || 0;
+      showToast(
+        failures > 0
+          ? `Cortes en ${node.name}: ${cuts} suspendidos, ${failures} fallaron.`
+          : `Cortes ejecutados en ${node.name}. Clientes suspendidos: ${cuts}.`,
+        failures > 0 ? 'warning' : 'success'
+      );
+    } catch (err: any) {
+      showToast(err.message || 'Error al ejecutar cortes', 'warning');
+    } finally {
+      setCutsLoading(false);
+      setCutsModal(null);
     }
   };
 
@@ -431,13 +535,22 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                       <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{node.name}</h3>
                     </div>
                     {userRole === 'ADMIN' && (
-                      <button 
-                        className="btn btn-danger btn-sm" 
-                        style={{ padding: '0.3rem' }}
-                        onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: node.id, name: node.name }); }}
-                      >
-                        Eliminar
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button 
+                          className="btn btn-secondary btn-sm" 
+                          style={{ padding: '0.3rem 0.6rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                          onClick={(e) => { e.stopPropagation(); handleOpenEdit(node); }}
+                        >
+                          <Pencil size={13} /> Editar
+                        </button>
+                        <button 
+                          className="btn btn-danger btn-sm" 
+                          style={{ padding: '0.3rem 0.6rem' }}
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: node.id, name: node.name }); }}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -479,13 +592,23 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                   </div>
 
                   <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.85rem', marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                    <button 
+                    <button
                       className="btn btn-secondary btn-sm"
                       onClick={(e) => { e.stopPropagation(); handleTestConnection(node.id); }}
                       disabled={status === 'testing'}
                     >
                       Test API Router
                     </button>
+                    {userRole === 'ADMIN' && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                        onClick={(e) => { e.stopPropagation(); setCutsModal({ node }); }}
+                        disabled={cutsLoading}
+                      >
+                        <WifiOff size={13} /> Ejecutar Cortes
+                      </button>
+                    )}
                     <button className="btn btn-primary btn-sm" style={{ pointerEvents: 'none' }}>
                       Administrar Nodo
                     </button>
@@ -608,14 +731,14 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
         )
       ) : null}
 
-      {/* Creation Modal */}
+      {/* Creation / Edit Modal */}
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+        <div className="modal-backdrop" onClick={() => { setIsModalOpen(false); resetForm(); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close-btn" onClick={() => setIsModalOpen(false)} aria-label="Cerrar">
+            <button type="button" className="modal-close-btn" onClick={() => { setIsModalOpen(false); resetForm(); }} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>Agregar Nuevo Nodo (Router)</h3>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.75rem' }}>{editingNode ? `Editar Nodo: ${editingNode.name}` : 'Agregar Nuevo Nodo (Router)'}</h3>
             
             <form onSubmit={handleCreateNode} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
@@ -642,8 +765,8 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                     <input type="text" placeholder="admin" value={user} onChange={e => setUser(e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label>Contraseña API *</label>
-                    <input type="password" placeholder="***" value={pass} onChange={e => setPass(e.target.value)} />
+                    <label>Contraseña API {editingNode ? '(dejar vacío para no cambiarla)' : '*'}</label>
+                    <input type="password" placeholder={editingNode ? '••• Sin cambios •••' : '***'} value={pass} onChange={e => setPass(e.target.value)} />
                   </div>
                 </div>
 
@@ -672,13 +795,13 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)} disabled={submitting}>Cancelar</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setIsModalOpen(false); resetForm(); }} disabled={submitting}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
                   {submitting ? (
                     <>
                       <RefreshCw size={14} className="animate-spin" /> Guardando...
                     </>
-                  ) : 'Añadir Equipo'}
+                  ) : editingNode ? 'Guardar Cambios' : 'Añadir Equipo'}
                 </button>
               </div>
             </form>
@@ -708,6 +831,39 @@ const Nodes: React.FC<NodesProps> = ({ token, userRole }) => {
                 }}
               >
                 Eliminar Permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cuts Confirmation Modal for individual node */}
+      {cutsModal && (
+        <div className="modal-backdrop" onClick={() => setCutsModal(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-btn" onClick={() => setCutsModal(null)} aria-label="Cerrar">
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <WifiOff size={20} color="var(--color-danger)" /> Ejecutar Cortes
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem', lineHeight: '1.5' }}>
+              Se suspenderán en MikroTik todos los clientes del nodo <strong>{cutsModal.node.name}</strong> ({cutsModal.node.mikrotikHost}) que tengan facturas vencidas con días de gracia expirados.
+            </p>
+            <div style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '0.65rem 0.85rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--color-danger)', lineHeight: 1.5 }}>
+              Los clientes bloqueados perderán conectividad inmediatamente. Asegurate de que la regla <code>cortados → drop</code> esté activa en el Firewall del router.
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setCutsModal(null)} disabled={cutsLoading}>Cancelar</button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => runNodeCuts(cutsModal.node)}
+                disabled={cutsLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                {cutsLoading ? <RefreshCw size={14} className="animate-spin" /> : <WifiOff size={14} />}
+                {cutsLoading ? 'Ejecutando...' : 'Confirmar Cortes'}
               </button>
             </div>
           </div>

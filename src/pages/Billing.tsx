@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare, WifiOff } from 'lucide-react';
+import { Calendar, Search, X, RefreshCw, MoreVertical, Printer, MessageSquare, WifiOff, AlertTriangle } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { fetchWithRetry } from '../utils/apiFetch';
 import TablePagination from '../components/mikrotik/TablePagination';
@@ -20,6 +20,7 @@ interface Invoice {
     dni: string;
   };
   contract: {
+    status?: string;
     graceDays: number;
     plan: {
       name: string;
@@ -124,6 +125,8 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   const [payNotes, setPayNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [paymentFormError, setPaymentFormError] = useState('');
+  const [invoiceToExpire, setInvoiceToExpire] = useState<Invoice | null>(null);
+  const [reactivateOnPay, setReactivateOnPay] = useState(false);
 
   const fetchInvoices = async () => {
     try {
@@ -187,7 +190,20 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
         throw new Error(data.error || 'Error registrando el pago');
       }
 
-      showToast('Pago registrado con éxito', 'success');
+      if (reactivateOnPay && selectedInvoice) {
+        try {
+          await fetch(`/api/clients/${selectedInvoice.client.id}/unblock`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          showToast('Pago registrado y servicio reactivado con éxito', 'success');
+        } catch {
+          showToast('Pago registrado. No se pudo reactivar automáticamente — hacelo manualmente.', 'warning');
+        }
+        setReactivateOnPay(false);
+      } else {
+        showToast('Pago registrado con éxito', 'success');
+      }
       setSelectedInvoice(null);
       setPayAmount('');
       setPayRef('');
@@ -343,13 +359,13 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
           <table>
             <thead>
               <tr>
-                <th className="desktop-only">N° Factura</th>
-                <th>Cliente</th>
-                <th className="desktop-only">Plan Contratado</th>
-                <th>Monto</th>
-                <th className="desktop-only">F. Vencimiento</th>
-                <th className="desktop-only">Estado</th>
-                {userRole !== 'READONLY' && <th style={{ textAlign: 'right' }}>Acciones</th>}
+                <th className="desktop-only" style={{ width: '13%' }}>N° Factura</th>
+                <th style={{ width: '22%' }}>Cliente</th>
+                <th className="desktop-only" style={{ width: '18%' }}>Plan Contratado</th>
+                <th style={{ width: '12%' }}>Monto</th>
+                <th className="desktop-only" style={{ width: '15%' }}>F. Vencimiento</th>
+                <th className="desktop-only" style={{ width: '15%' }}>Estado</th>
+                {userRole !== 'READONLY' && <th style={{ width: '5%', textAlign: 'right' }}>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -522,6 +538,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                                   setActiveDropdown(null);
                                   setSelectedInvoice(inv);
                                   setPayAmount(inv.amount.toString());
+                                  setReactivateOnPay(false);
                                 }}
                               >
                                 Registrar Cobro
@@ -542,7 +559,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                                 }}
                                 onClick={() => {
                                   setActiveDropdown(null);
-                                  handleForceExpire(inv.id);
+                                  setInvoiceToExpire(inv);
                                 }}
                               >
                                 Vencer
@@ -606,7 +623,11 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                   <button 
                     className="btn btn-success btn-sm" 
                     style={{flex: '1 1 auto', textAlign: 'center', marginLeft: '0.5rem'}}
-                    onClick={() => setSelectedInvoice(inv)}
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setPayAmount(inv.amount.toString());
+                      setReactivateOnPay(false);
+                    }}
                   >
                     Pagada
                   </button>
@@ -615,7 +636,7 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                   <button 
                     className="btn btn-danger btn-sm" 
                     style={{flex: '1 1 auto', textAlign: 'center', marginLeft: '0.5rem'}}
-                    onClick={() => handleForceExpire(inv.id)}
+                    onClick={() => setInvoiceToExpire(inv)}
                   >
                     Vencer
                   </button>
@@ -675,6 +696,29 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                   <label>Notas de Cobro</label>
                   <textarea rows={2} placeholder="Comentarios adicionales" value={payNotes} onChange={e => setPayNotes(e.target.value)} />
                 </div>
+
+                {selectedInvoice.contract?.status === 'SUSPENDED' && (
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    padding: '0.75rem',
+                    border: '1px solid rgba(34,197,94,0.35)',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(34,197,94,0.08)',
+                    color: 'var(--text-main)',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    marginBottom: '1rem'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={reactivateOnPay}
+                      onChange={(e) => setReactivateOnPay(e.target.checked)}
+                    />
+                    Reactivar servicio en MikroTik al registrar este pago
+                  </label>
+                )}
               </div>
 
               <div className="modal-footer">
@@ -857,6 +901,39 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                 }}
               >
                 <Printer size={14} /> Imprimir Recibo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Vencer Modal */}
+      {invoiceToExpire && (
+        <div className="modal-backdrop" onClick={() => setInvoiceToExpire(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <button type="button" className="modal-close-btn" onClick={() => setInvoiceToExpire(null)} aria-label="Cerrar">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div className="modal-body">
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={20} color="var(--color-danger)" /> Vencer Factura
+              </h3>
+              <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                ¿Está seguro de forzar el vencimiento de la factura <strong>{invoiceToExpire.invoiceNumber}</strong> del cliente <strong>{invoiceToExpire.client?.fullName}</strong>? Esta acción cambiará su estado a Vencida administrativamente.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setInvoiceToExpire(null)}>Cancelar</button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={() => {
+                  const id = invoiceToExpire.id;
+                  setInvoiceToExpire(null);
+                  handleForceExpire(id);
+                }}
+              >
+                Confirmar Vencimiento
               </button>
             </div>
           </div>

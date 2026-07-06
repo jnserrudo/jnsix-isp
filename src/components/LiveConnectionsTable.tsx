@@ -3,7 +3,7 @@ import { RefreshCw, Wifi, WifiOff, Activity } from 'lucide-react';
 import axios from 'axios';
 import TablePagination from './mikrotik/TablePagination';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 interface Connection {
   type: 'PPPoE' | 'DHCP' | 'Static IP';

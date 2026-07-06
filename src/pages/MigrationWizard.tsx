@@ -12,7 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import TablePagination from '../components/mikrotik/TablePagination';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 interface Node {
   id: string;

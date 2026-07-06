@@ -604,7 +604,7 @@ th.desktop-only, td.desktop-only {
 
 /* Blueprint Tables */
 .table-wrapper {
-  overflow-x: auto;
+  overflow: visible;
   border: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
 }
@@ -623,12 +623,12 @@ th {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 1.1rem 1.5rem;
+  padding: 0.85rem 0.85rem;
   border-bottom: 2px solid var(--border-color);
 }
 
 td {
-  padding: 1.1rem 1.5rem;
+  padding: 0.85rem 0.85rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
   font-size: 0.9rem;

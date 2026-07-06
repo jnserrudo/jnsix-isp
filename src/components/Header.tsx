@@ -34,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetchWithRetry('http://localhost:4000/api/notifications?limit=10', {
+      const res = await fetchWithRetry('/api/notifications?limit=10', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -67,7 +67,7 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
   const markAsRead = async (id: string) => {
     try {
       const token = localStorage.getItem('token');
-      await fetchWithRetry(`http://localhost:4000/api/notifications/${id}/read`, {
+      await fetchWithRetry(`/api/notifications/${id}/read`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -80,7 +80,7 @@ const Header: React.FC<HeaderProps> = ({ userName, onToggleSidebar }) => {
   const markAllAsRead = async () => {
     try {
       const token = localStorage.getItem('token');
-      await fetchWithRetry('http://localhost:4000/api/notifications/read-all', {
+      await fetchWithRetry('/api/notifications/read-all', {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });

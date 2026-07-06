@@ -41,7 +41,7 @@ const Tickets: React.FC<TicketsProps> = ({ token }) => {
   const fetchTickets = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:4000/api/tickets', {
+      const res = await fetch('/api/tickets', {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Error al obtener tickets');

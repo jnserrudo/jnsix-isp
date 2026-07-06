@@ -12,8 +12,8 @@ interface AuditLog {
   entityId: string;
   action: string;
   userId: string;
-  oldValues: any;
-  newValues: any;
+  dataBefore: any;
+  dataAfter: any;
   description: string;
   ipAddress: string | null;
   userAgent: string | null;
@@ -311,11 +311,11 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
             <table>
               <thead>
                 <tr>
-                  <th>Fecha y Hora</th>
-                  <th>Operador / Usuario</th>
-                  <th>Módulo</th>
-                  <th>Acción Realizada</th>
-                  <th style={{ textAlign: 'right' }}>Detalle</th>
+                  <th style={{ width: '18%' }}>Fecha y Hora</th>
+                  <th style={{ width: '18%' }}>Operador / Usuario</th>
+                  <th style={{ width: '12%' }}>Módulo</th>
+                  <th style={{ width: '47%' }}>Acción Realizada</th>
+                  <th style={{ width: '5%', textAlign: 'right' }}>Detalle</th>
                 </tr>
               </thead>
               <tbody>
@@ -365,7 +365,7 @@ const Audit: React.FC<AuditProps> = ({ token }) => {
                         <tr style={{ backgroundColor: 'rgba(56, 189, 248, 0.02)' }}>
                           <td colSpan={5} style={{ padding: '0' }}>
                             <div style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-                              <DiffViewer oldValues={log.oldValues} newValues={log.newValues} />
+                              <DiffViewer oldValues={log.dataBefore} newValues={log.dataAfter} />
                             </div>
                           </td>
                         </tr>

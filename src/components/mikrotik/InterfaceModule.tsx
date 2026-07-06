@@ -13,7 +13,7 @@ import {
 import EduBox from './EduBox';
 import TablePagination from './TablePagination';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || '';
 
 interface InterfaceData {
   '.id': string;
@@ -1127,7 +1127,7 @@ const InterfaceModule: React.FC<Props> = ({ nodeId, onAddLog }) => {
                 }}
               >
                 <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.35rem' }}>
-                  ⚠️ Impacto Técnico y Efectos en la Red
+                  Impacto Técnico y Efectos en la Red
                 </span>
                 <p style={{ margin: 0, lineHeight: 1.4, color: 'var(--text-main)' }}>
                   {pendingAction.impact}

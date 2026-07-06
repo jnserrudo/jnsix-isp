@@ -284,13 +284,13 @@ const Plans: React.FC<PlansProps> = ({ token, userRole }) => {
           <table>
             <thead>
               <tr>
-                <th>Nombre del Plan</th>
-                <th>Velocidad (B/S)</th>
-                <th>Precio Mensual</th>
-                <th>MikroTik Profile</th>
-                <th>Abonados Activos</th>
-                <th>Estado</th>
-                <th style={{ textAlign: 'right' }}>Acciones</th>
+                <th style={{ width: '25%' }}>Nombre del Plan</th>
+                <th style={{ width: '18%' }}>Velocidad (B/S)</th>
+                <th style={{ width: '15%' }}>Precio Mensual</th>
+                <th style={{ width: '18%' }}>MikroTik Profile</th>
+                <th style={{ width: '12%' }}>Abonados Activos</th>
+                <th style={{ width: '8%' }}>Estado</th>
+                <th style={{ width: '4%', textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>

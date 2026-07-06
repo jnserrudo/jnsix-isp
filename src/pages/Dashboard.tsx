@@ -66,6 +66,9 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   const [nodes, setNodes] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string>('');
 
+  // Node selection inside the cuts confirmation modal
+  const [cutsNodeId, setCutsNodeId] = useState<string>('');
+
   const fetchStats = async (nodeId?: string) => {
     setLoading(true);
     try {
@@ -115,10 +118,12 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
       message: msg
     });
   };
-  const triggerCuts = () => {
+  const triggerCuts = (presetNodeId?: string) => {
+    if (presetNodeId) setCutsNodeId(presetNodeId);
+    else setCutsNodeId('');
     setConfirmAction({
       type: 'cuts',
-      message: '¿Está seguro de iniciar el proceso de corte automático en MikroTik para los morosos?'
+      message: ''
     });
   };
 
@@ -136,19 +141,29 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   const runCutsAction = async () => {
     setActionLoading('cuts');
     setActionMessage('');
-    showToast('Ejecutando cortes en MikroTik...', 'info');
+    const nodeLabel = cutsNodeId ? nodes.find(n => n.id === cutsNodeId)?.name || cutsNodeId : 'todos los nodos';
+    showToast(`Ejecutando cortes en MikroTik (${nodeLabel})...`, 'info');
     try {
       const response = await fetch('/api/invoices/trigger-cuts', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ nodeId: cutsNodeId || undefined })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Error al ejecutar cortes');
-      setActionMessage(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`);
-      showToast(`Proceso de cortes automáticos ejecutado con éxito. Se suspendieron ${data.cutsExecuted || 0} clientes.`, 'success');
+      const cuts = data.cutsExecuted || 0;
+      const failures = data.errors || 0;
+      const failureNote = failures > 0 ? ` Fallos en MikroTik: ${failures}. Revisá acciones recientes.` : '';
+      setActionMessage(`Cortes ejecutados (${nodeLabel}). Clientes suspendidos: ${cuts}.${failureNote}`);
+      showToast(
+        failures > 0
+          ? `Cortes: ${cuts} suspendidos, ${failures} fallaron en ${nodeLabel}.`
+          : `Cortes ejecutados. Se suspendieron ${cuts} clientes en ${nodeLabel}.`,
+        failures > 0 ? 'warning' : 'success'
+      );
       fetchStats(selectedNodeId);
     } catch (err: any) {
       const errMsg = err.message || 'Fallo de cortes manual';
@@ -175,7 +190,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
   }
 
   // Calculate percentage of collection
-  const collectedPct = stats?.billingMonth.invoiced && stats.billingMonth.invoiced > 0 
+  const collectedPct = stats?.billingMonth?.invoiced && stats.billingMonth.invoiced > 0 
     ? Math.round((stats.billingMonth.collected / stats.billingMonth.invoiced) * 100)
     : 0;
 
@@ -322,7 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
                 </button>
                 <button 
                   className="btn btn-danger" 
-                  onClick={triggerCuts}
+                  onClick={() => triggerCuts()}
                   disabled={actionLoading !== null || isBillingRunning}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
@@ -508,28 +523,67 @@ const Dashboard: React.FC<DashboardProps> = ({ token, userRole }) => {
             <button type="button" className="modal-close-btn" onClick={() => setConfirmAction({ type: null, message: '' })} aria-label="Cerrar">
               <X size={18} />
             </button>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>Confirmar Acción</h3>
-            <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '2rem', lineHeight: '1.5' }}>
-              {confirmAction.message}
-            </p>
-             <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setConfirmAction({ type: null, message: '' })}>Cancelar</button>
-              <button 
-                type="button" 
-                className="btn btn-primary" 
-                onClick={() => {
-                  const type = confirmAction.type;
-                  setConfirmAction({ type: null, message: '' });
-                  if (type === 'billing') {
-                    runBillingAction();
-                  } else if (type === 'cuts') {
-                    runCutsAction();
-                  }
-                }}
-              >
-                Confirmar
-              </button>
-            </div>
+
+            {confirmAction.type === 'cuts' ? (
+              <>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <WifiOff size={20} color="var(--color-danger)" /> Ejecutar Cortes Automáticos
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                  Esta acción bloqueará en MikroTik a todos los clientes con facturas vencidas y días de gracia expirados. Elegí el alcance:
+                </p>
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.4rem', display: 'block' }}>Aplicar a:</label>
+                  <select
+                    value={cutsNodeId}
+                    onChange={(e) => setCutsNodeId(e.target.value)}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">Todos los MikroTik</option>
+                    {nodes.map(n => (
+                      <option key={n.id} value={n.id}>{n.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px', padding: '0.65rem 0.85rem', marginBottom: '1.25rem', fontSize: '0.8rem', color: 'var(--color-danger)', lineHeight: 1.5 }}>
+                  Los clientes bloqueados perderán conectividad inmediatamente. Asegurate de que la regla <code>cortados → drop</code> esté activa en el Firewall del router.
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setConfirmAction({ type: null, message: '' })}>Cancelar</button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => {
+                      setConfirmAction({ type: null, message: '' });
+                      runCutsAction();
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <WifiOff size={14} /> Confirmar Cortes
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '1.5rem' }}>Confirmar Acción</h3>
+                <p style={{ color: 'var(--text-main)', fontSize: '0.9rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+                  {confirmAction.message}
+                </p>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setConfirmAction({ type: null, message: '' })}>Cancelar</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => {
+                      setConfirmAction({ type: null, message: '' });
+                      runBillingAction();
+                    }}
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

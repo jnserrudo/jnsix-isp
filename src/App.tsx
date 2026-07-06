@@ -110,9 +110,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 <Route path="/nodes" element={<Nodes token={token} userRole={user.role} />} />
                 <Route path="/mikrotik-test" element={<MikrotikTest />} />
                 <Route path="/mikrotik" element={<MikrotikManagementCenter />} />
+                <Route path="/mikrotik-management" element={<MikrotikManagementCenter />} />
                 <Route path="/migration" element={<MigrationWizard />} />
+                <Route path="/migration-wizard" element={<MigrationWizard />} />
                 <Route path="/plans" element={<Plans token={token} userRole={user.role} />} />
                 <Route path="/plans-increase" element={<PlansIncrease />} />
+                <Route path="/plans/increase" element={<PlansIncrease />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/audit" element={<Audit token={token} userRole={user.role} />} />
               </>

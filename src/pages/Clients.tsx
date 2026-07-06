@@ -32,14 +32,73 @@ interface Client {
   email: string | null;
   status: 'ACTIVE' | 'SUSPENDED' | 'DELINQUENT' | 'CANCELLED';
   address: string;
+  clientCode?: string;
   createdAt: string;
   contracts?: Contract[];
+  invoices?: any[];
 }
 
 interface ClientsProps {
   token: string;
   userRole: string;
 }
+
+const getClientDetailedStatus = (client: any) => {
+  const isSuspended = client.contracts?.some((c: any) => c.status === 'SUSPENDED') || client.status === 'SUSPENDED';
+  const hasUnpaidInvoices = client.invoices?.some((inv: any) => ['PENDING', 'PARTIAL', 'OVERDUE'].includes(inv.status));
+  const hasOverdueInvoices = client.invoices?.some((inv: any) => inv.status === 'OVERDUE');
+
+  if (isSuspended) {
+    if (!hasUnpaidInvoices) {
+      return {
+        label: 'Suspendido - Pago al Día',
+        sublabel: 'Pendiente reactivación',
+        badgeClass: 'badge-suspended',
+        color: '#f87171',
+        iconColor: '#f87171',
+        description: 'El cliente abonó sus facturas pero su servicio en MikroTik aún no fue reactivado. Requiere reactivación manual.'
+      };
+    } else {
+      return {
+        label: 'Suspendido - Con Deuda',
+        sublabel: 'Corte por mora',
+        badgeClass: 'badge-suspended',
+        color: 'var(--accent)',
+        iconColor: 'var(--accent)',
+        description: 'Servicio suspendido en MikroTik y posee facturas vencidas o pendientes de pago.'
+      };
+    }
+  } else {
+    if (hasOverdueInvoices) {
+      return {
+        label: 'Activo - Vencido',
+        sublabel: 'Tol. expirada',
+        badgeClass: 'badge-warning',
+        color: '#fbbf24',
+        iconColor: '#fbbf24',
+        description: 'El servicio está activo, pero posee facturas vencidas fuera de tolerancia. Apto para suspensión.'
+      };
+    } else if (hasUnpaidInvoices) {
+      return {
+        label: 'Activo - Pendiente',
+        sublabel: 'Factura emitida',
+        badgeClass: 'badge-delinquent',
+        color: '#60a5fa',
+        iconColor: '#60a5fa',
+        description: 'El servicio está activo y posee una factura pendiente dentro del plazo de vencimiento.'
+      };
+    } else {
+      return {
+        label: 'Activo - Al Día',
+        sublabel: 'Servicio normal',
+        badgeClass: 'badge-active',
+        color: 'var(--color-success)',
+        iconColor: 'var(--color-success)',
+        description: 'El servicio está activo y no posee deudas registradas.'
+      };
+    }
+  }
+};
 
 const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
   const [clients, setClients] = useState<Client[]>([]);
@@ -138,8 +197,14 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
     e.preventDefault();
     setFormError('');
 
-    if (!fullName || !dni || !address) {
-      setFormError('Nombre, DNI y Dirección son requeridos');
+    const missing: string[] = [];
+    if (!fullName || !fullName.trim()) missing.push('Nombre Completo');
+    if (!dni || !dni.trim()) missing.push('DNI');
+    if (!clientCode || !clientCode.trim()) missing.push('Código de Cliente');
+    if (!address || !address.trim()) missing.push('Dirección');
+
+    if (missing.length > 0) {
+      setFormError(`Falta completar: ${missing.join(', ')}`);
       return;
     }
 
@@ -438,17 +503,17 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
           <table>
             <thead>
               <tr>
-                <th>Nombre Completo</th>
-                <th className="desktop-only">DNI / Identificación</th>
-                <th className="desktop-only">Contacto</th>
-                <th className="desktop-only">Conexión / Red</th>
-                <th>Estado</th>
-                <th className="desktop-only">Dirección</th>
-                <th style={{ textAlign: 'right' }}>Acciones</th>
+                <th style={{ width: '22%' }}>Nombre Completo</th>
+                <th className="desktop-only" style={{ width: '12%' }}>DNI / Identificación</th>
+                <th className="desktop-only" style={{ width: '14%' }}>Contacto</th>
+                <th className="desktop-only" style={{ width: '18%' }}>Conexión / Red</th>
+                <th style={{ width: '15%' }}>Estado</th>
+                <th className="desktop-only" style={{ width: '14%' }}>Dirección</th>
+                <th style={{ width: '5%', textAlign: 'right' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedClients.map((client) => (
+              {paginatedClients.map((client, index) => (
                 <tr key={client.id} className="table-row-hover">
                   <td data-label="Nombre Completo" style={{ fontWeight: 600 }}>
                     <Link to={`/clients/${client.id}`} style={{ color: 'var(--accent)', textDecoration: 'none', display: 'inline-block' }}>
@@ -456,6 +521,11 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                         {client.fullName}
                       </div>
                     </Link>
+                    {client.clientCode && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', fontFamily: 'monospace', marginTop: '0.1rem' }}>
+                        {client.clientCode}
+                      </div>
+                    )}
                     <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.25rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                       DNI: {client.dni} <br />
                       Tel: {client.phone1 || 'Sin contacto'} <br />
@@ -506,15 +576,28 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                     )}
                   </td>
                   <td data-label="Estado">
-                    <span className={`badge ${
-                      client.status === 'ACTIVE' ? 'badge-active' :
-                      client.status === 'SUSPENDED' ? 'badge-suspended' :
-                      client.status === 'DELINQUENT' ? 'badge-delinquent' : 'badge-cancelled'
-                    }`}>
-                      {client.status === 'ACTIVE' ? 'Activo' :
-                       client.status === 'SUSPENDED' ? 'Suspendido' :
-                       client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
-                    </span>
+                    {(() => {
+                      const detStatus = getClientDetailedStatus(client);
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                          <span 
+                            className={`badge ${detStatus.badgeClass}`}
+                            title={detStatus.description}
+                            style={{ 
+                              cursor: 'help',
+                              border: `1px solid ${detStatus.color}`,
+                              color: detStatus.color,
+                              backgroundColor: `${detStatus.color}0a`
+                            }}
+                          >
+                            {detStatus.label}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {detStatus.sublabel}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td data-label="Dirección" className="desktop-only" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {client.address}
@@ -536,11 +619,10 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                           style={{
                             position: 'absolute',
                             right: 0,
-                            top: '100%',
-                            marginTop: '4px',
+                            ...(index >= paginatedClients.length - 3 ? { bottom: '100%', marginBottom: '4px' } : { top: '100%', marginTop: '4px' }),
                             backgroundColor: 'var(--bg-secondary)',
                             border: '1px solid var(--border-color)',
-                            zIndex: 100,
+                            zIndex: 1000,
                             minWidth: '150px',
                             display: 'flex',
                             flexDirection: 'column',
@@ -647,15 +729,21 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
             <div key={client.id} className="mobile-card-item">
               <div className="mobile-card-header">
                 <div className="mobile-card-title">{client.fullName}</div>
-                <span className={`badge ${
-                  client.status === 'ACTIVE' ? 'badge-active' :
-                  client.status === 'SUSPENDED' ? 'badge-suspended' :
-                  client.status === 'DELINQUENT' ? 'badge-delinquent' : 'badge-cancelled'
-                }`}>
-                  {client.status === 'ACTIVE' ? 'Activo' :
-                   client.status === 'SUSPENDED' ? 'Suspendido' :
-                   client.status === 'DELINQUENT' ? 'Moroso' : 'Cancelado'}
-                </span>
+                {(() => {
+                  const detStatus = getClientDetailedStatus(client);
+                  return (
+                    <span 
+                      className={`badge ${detStatus.badgeClass}`}
+                      style={{ 
+                        border: `1px solid ${detStatus.color}`,
+                        color: detStatus.color,
+                        backgroundColor: `${detStatus.color}0a`
+                      }}
+                    >
+                      {detStatus.label}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="mobile-card-body">
                 <div className="mobile-card-row">
@@ -809,7 +897,13 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
 
                 <div className="form-group">
                   <label>Dirección Completa (con referencias) *</label>
-                  <textarea rows={2} placeholder="Ej: Calle Falsa 123. Casa portón verde frente al kiosco." value={address} onChange={e => setAddress(e.target.value)} />
+                  <textarea 
+                    rows={2} 
+                    className={!address && formError ? "input-error" : ""} 
+                    placeholder="Ej: Calle Falsa 123. Casa portón verde frente al kiosco." 
+                    value={address} 
+                    onChange={e => { setAddress(e.target.value); if (formError) setFormError(""); }} 
+                  />
                 </div>
 
                 <div className="form-group">

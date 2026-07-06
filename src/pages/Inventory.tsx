@@ -35,7 +35,7 @@ const Inventory: React.FC = () => {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:4000/api/inventory', {
+      const res = await fetch('/api/inventory', {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       if (res.ok) {
@@ -129,7 +129,7 @@ const Inventory: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Seguro que deseas eliminar este ítem?')) return;
     try {
-      const res = await fetch(`http://localhost:4000/api/inventory/${id}`, {
+      const res = await fetch(`/api/inventory/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
