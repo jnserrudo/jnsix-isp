@@ -272,6 +272,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   const [onuModel, setOnuModel] = useState('');
 
   const [editFormError, setEditFormError] = useState('');
+  const [editingContractId, setEditingContractId] = useState<string | null>(null);
   const [generatingCode, setGeneratingCode] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -493,32 +494,39 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
     e.preventDefault();
     setContractFormError('');
     if (!selectedPlanId || !selectedNodeId) {
-      setContractFormError('Debe seleccionar un plan y un nodo para crear el contrato.');
+      setContractFormError('Debe seleccionar un plan y un nodo para guardar el contrato.');
       return;
     }
 
     setSubmitting(true);
-    showToast('Asignando contrato...', 'info');
+    showToast(editingContractId ? 'Actualizando contrato...' : 'Asignando contrato...', 'info');
     try {
-      const response = await fetch('/api/contracts', {
-        method: 'POST',
+      const url = editingContractId ? `/api/contracts/${editingContractId}` : '/api/contracts';
+      const method = editingContractId ? 'PUT' : 'POST';
+      const bodyData: any = {
+        planId: selectedPlanId,
+        nodeId: selectedNodeId,
+        billingDay: parseInt(billingDay),
+        graceDays: parseInt(graceDays),
+        pppoeUsername: pppoeUser || null,
+        pppoePassword: pppoePass || null,
+        staticIp: staticIp || null,
+        macAddress: macAddr || null,
+        onuSerial: onuSerial || null,
+        onuModel: onuModel || null,
+      };
+
+      if (!editingContractId) {
+        bodyData.clientId = id;
+      }
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          clientId: id,
-          planId: selectedPlanId,
-          nodeId: selectedNodeId,
-          billingDay: parseInt(billingDay),
-          graceDays: parseInt(graceDays),
-          pppoeUsername: pppoeUser || null,
-          pppoePassword: pppoePass || null,
-          staticIp: staticIp || null,
-          macAddress: macAddr || null,
-          onuSerial: onuSerial || null,
-          onuModel: onuModel || null,
-        })
+        body: JSON.stringify(bodyData)
       });
 
       if (!response.ok) {
@@ -526,11 +534,12 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         throw new Error(data.error || 'Error al guardar contrato');
       }
 
-      showToast('Contrato guardado con éxito', 'success');
+      showToast(editingContractId ? 'Contrato actualizado con éxito' : 'Contrato guardado con éxito', 'success');
       setIsContractModalOpen(false);
+      setEditingContractId(null);
       fetchClientData(0, true);
     } catch (err: any) {
-      const errMsg = err.message || 'Error al asignar contrato';
+      const errMsg = err.message || 'Error al guardar contrato';
       showToast(errMsg, 'warning');
     } finally {
       setSubmitting(false);
@@ -1582,10 +1591,83 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
       <div className={`card ${mobileTab === 'network' ? '' : 'desktop-only'}`} style={{ marginBottom: '2rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Contrato y Servicio Técnico</h3>
-          {client.contracts.length === 0 && userRole !== 'READONLY' && (
-            <button className="btn btn-primary btn-sm" onClick={() => setIsContractModalOpen(true)}>
-              <Plus size={14} /> Asignar Contrato/Plan
-            </button>
+          {userRole !== 'READONLY' && (
+            client.contracts.length === 0 ? (
+              <button 
+                className="btn btn-primary btn-sm" 
+                onClick={() => {
+                  setEditingContractId(null);
+                  setSelectedPlanId('');
+                  setSelectedNodeId('');
+                  setBillingDay('5');
+                  setGraceDays('5');
+                  setPppoeUser('');
+                  setPppoePass('');
+                  setStaticIp('');
+                  setMacAddr('');
+                  setOnuSerial('');
+                  setOnuModel('VSOL XPON');
+                  setIsContractModalOpen(true);
+                }}
+              >
+                <Plus size={14} /> Asignar Contrato/Plan
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={() => {
+                    const contract = client.contracts[0];
+                    setEditingContractId(contract.id);
+                    setSelectedPlanId(contract.planId);
+                    setSelectedNodeId(contract.nodeId);
+                    setBillingDay(contract.billingDay.toString());
+                    setGraceDays(contract.graceDays.toString());
+                    setPppoeUser(contract.pppoeUsername || '');
+                    setPppoePass(contract.pppoePassword || '');
+                    setStaticIp(contract.staticIp || '');
+                    setMacAddr(contract.macAddress || '');
+                    setOnuSerial(contract.onuSerial || '');
+                    setOnuModel(contract.onuModel || 'VSOL XPON');
+                    setIsContractModalOpen(true);
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  <Edit size={14} /> Modificar Contrato
+                </button>
+                <button 
+                  className="btn btn-secondary btn-sm" 
+                  onClick={async () => {
+                    const contract = client.contracts[0];
+                    if (window.confirm('¿Está seguro de que desea eliminar el contrato de este cliente? Esta acción también detendrá la automatización en MikroTik.')) {
+                      setSubmitting(true);
+                      showToast('Eliminando contrato...', 'info');
+                      try {
+                        const response = await fetch(`/api/contracts/${contract.id}`, {
+                          method: 'DELETE',
+                          headers: {
+                            'Authorization': `Bearer ${token}`
+                          }
+                        });
+                        if (!response.ok) {
+                          const data = await response.json();
+                          throw new Error(data.error || 'Error al eliminar contrato');
+                        }
+                        showToast('Contrato eliminado con éxito', 'success');
+                        fetchClientData(0, true);
+                      } catch (err: any) {
+                        showToast(err.message || 'Error al eliminar contrato', 'warning');
+                      } finally {
+                        setSubmitting(false);
+                      }
+                    }
+                  }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', borderColor: 'var(--color-danger)', color: 'var(--color-danger)' }}
+                >
+                  <Trash2 size={14} /> Eliminar Contrato
+                </button>
+              </div>
+            )
           )}
         </div>
 
