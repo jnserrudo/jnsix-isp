@@ -1360,6 +1360,12 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
           {(() => {
             const migrationInfo = parseMigrationNotes(client.notes);
             const displayNotes = migrationInfo ? migrationInfo.cleanNotes : client.notes;
+            const activeContract = client.contracts && client.contracts[0];
+            const showMigrationCard = migrationInfo && (
+              !activeContract || 
+              (activeContract.staticIp && activeContract.staticIp === migrationInfo.data.name) ||
+              (activeContract.pppoeUsername && activeContract.pppoeUsername === migrationInfo.data.name)
+            );
             
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1374,7 +1380,7 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                 )}
                 
                 {/* 2. Graphical Match History Card */}
-                {migrationInfo && (
+                {showMigrationCard && (
                   <div style={{ 
                     padding: '1rem', 
                     backgroundColor: 'var(--bg-secondary)', 
@@ -1406,7 +1412,12 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                         </div>
                         <div>
                           <span style={{ color: 'var(--text-muted)' }}>Identificador en Router:</span>
-                          <div style={{ color: '#ffffff', fontWeight: 600 }}>{migrationInfo.data.name}</div>
+                          <div style={{ color: '#ffffff', fontWeight: 600 }}>
+                            {migrationInfo.data.name}
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', fontWeight: 'normal', fontFamily: 'sans-serif', marginTop: '0.1rem' }}>
+                              ({migrationInfo.data.type === 'StaticIP' ? 'IP' : 'Usuario'} de importacion historica, sin impacto tecnico)
+                            </span>
+                          </div>
                         </div>
                         {migrationInfo.data.comment && (
                           <div style={{ gridColumn: 'span 2' }}>
@@ -1694,13 +1705,23 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                 {contract.pppoeUsername ? (
                   <>
                     <p style={{ fontSize: '0.9rem' }}>Modo: <strong>PPPoE Secret</strong></p>
-                    <p style={{ fontSize: '0.9rem' }}>Usuario: <code style={{ color: 'var(--accent)' }}>{contract.pppoeUsername}</code></p>
+                    <p style={{ fontSize: '0.9rem' }}>
+                      Usuario: <code style={{ color: 'var(--accent)' }}>{contract.pppoeUsername}</code>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>
+                        (Usuario operativo activo utilizado para cortes y reconexiones)
+                      </span>
+                    </p>
                     <p style={{ fontSize: '0.9rem' }}>Contraseña: <code>{contract.pppoePassword}</code></p>
                   </>
                 ) : contract.staticIp ? (
                   <>
                     <p style={{ fontSize: '0.9rem' }}>Modo: <strong>IP Estática / Address List</strong></p>
-                    <p style={{ fontSize: '0.9rem' }}>IP: <code style={{ color: 'var(--accent)' }}>{contract.staticIp}</code></p>
+                    <p style={{ fontSize: '0.9rem' }}>
+                      IP: <code style={{ color: 'var(--accent)' }}>{contract.staticIp}</code>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.1rem' }}>
+                        (IP operativa activa utilizada para cortes y reconexiones)
+                      </span>
+                    </p>
                     {contract.macAddress && <p style={{ fontSize: '0.9rem' }}>MAC: <code>{contract.macAddress}</code></p>}
                   </>
                 ) : (
