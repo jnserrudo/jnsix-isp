@@ -2493,6 +2493,31 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
 
             <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
+                {selectedInvoice?.debtInfo && (selectedInvoice.debtInfo.moraAmount > 0 || selectedInvoice.debtInfo.totalPayments > 0) && (
+                  <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', borderLeft: '3px solid var(--accent)' }}>
+                    <h4 style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>Desglose de Deuda</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                      <span>Monto Original:</span>
+                      <span>${selectedInvoice.debtInfo.activeTotal} ARS</span>
+                    </div>
+                    {selectedInvoice.debtInfo.moraAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                        <span>Interés por Mora ({selectedInvoice.debtInfo.daysLate} días):</span>
+                        <span>${selectedInvoice.debtInfo.moraAmount} ARS</span>
+                      </div>
+                    )}
+                    {selectedInvoice.debtInfo.totalPayments > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                        <span>Pagos Anteriores:</span>
+                        <span style={{ color: 'var(--color-success)' }}>-${selectedInvoice.debtInfo.totalPayments} ARS</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+                      <span>Saldo a Pagar:</span>
+                      <span>${selectedInvoice.debtInfo.balance} ARS</span>
+                    </div>
+                  </div>
+                )}
                 <FormAlert message={paymentFormError} />
                 <div className="form-group">
                   <label>Monto Recibido ($ ARS) *</label>

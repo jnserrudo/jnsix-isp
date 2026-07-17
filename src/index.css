@@ -660,6 +660,12 @@ tr:hover td {
   white-space: nowrap;
 }
 
+.badge-warning {
+  background-color: rgba(234, 179, 8, 0.15);
+  color: var(--color-warning);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
 .badge-active {
   color: #0f766e;
   border-color: #0f766e;

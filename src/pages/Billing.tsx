@@ -11,7 +11,7 @@ interface Invoice {
   id: string;
   invoiceNumber: string;
   amount: number;
-  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  status: 'PENDING' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'PARTIAL';
   dueDate: string;
   issuedAt: string;
   client: {
@@ -127,6 +127,8 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
   const [paymentFormError, setPaymentFormError] = useState('');
   const [invoiceToExpire, setInvoiceToExpire] = useState<Invoice | null>(null);
   const [reactivateOnPay, setReactivateOnPay] = useState(false);
+  const [debtInfo, setDebtInfo] = useState<any>(null);
+  const [loadingDebt, setLoadingDebt] = useState(false);
 
   const fetchInvoices = async () => {
     try {
@@ -204,11 +206,14 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
       } else {
         showToast('Pago registrado con éxito', 'success');
       }
+      
+      await fetchInvoices();
+      
       setSelectedInvoice(null);
       setPayAmount('');
       setPayRef('');
       setPayNotes('');
-      fetchInvoices();
+      setDebtInfo(null);
     } catch (err: any) {
       setPaymentFormError(err.message || 'Error registrando el pago');
     } finally {
@@ -395,13 +400,15 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                             <div>
                               <span className={`badge ${
                                 inv.status === 'PAID' ? 'badge-active' :
+                                inv.status === 'PARTIAL' ? 'badge-delinquent' :
                                 isGraceExpired ? 'badge-suspended' : 'badge-delinquent'
                               }`} style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}>
                                 {inv.status === 'PAID' ? 'Pagada' :
+                                 inv.status === 'PARTIAL' ? 'Pago Parcial' :
                                  isGraceExpired ? 'Vencida' : 'Pendiente'}
                               </span>
                             </div>
-                            <span style={{ fontSize: '0.68rem', color: inv.status === 'PAID' ? 'var(--color-success)' : isGraceExpired ? 'var(--accent)' : 'var(--color-warning)', fontWeight: 600 }}>
+                            <span style={{ fontSize: '0.68rem', color: inv.status === 'PAID' ? 'var(--color-success)' : inv.status === 'PARTIAL' ? 'var(--color-warning)' : isGraceExpired ? 'var(--accent)' : 'var(--color-warning)', fontWeight: 600 }}>
                               Vence: {new Date(inv.dueDate).toLocaleDateString()}
                             </span>
                           </div>
@@ -423,6 +430,19 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
 
                       if (inv.status === 'PAID') {
                         return <span className="badge badge-active">Pagada</span>;
+                      }
+                      
+                      if (inv.status === 'PARTIAL') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <div>
+                              <span className="badge badge-delinquent" style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)' }}>Pago Parcial</span>
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: '#eab308', fontWeight: 600 }}>
+                              Deuda Pendiente
+                            </span>
+                          </div>
+                        );
                       }
 
                       if (isGraceExpired) {
@@ -534,11 +554,27 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                                   cursor: 'pointer',
                                   borderBottom: inv.status === 'PENDING' ? '1px solid var(--border-color)' : 'none'
                                 }}
-                                onClick={() => {
+                                onClick={async () => {
                                   setActiveDropdown(null);
                                   setSelectedInvoice(inv);
-                                  setPayAmount(inv.amount.toString());
+                                  setPayAmount('');
                                   setReactivateOnPay(false);
+                                  setDebtInfo(null);
+                                  setLoadingDebt(true);
+                                  try {
+                                    const res = await fetch(`/api/invoices/${inv.id}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      setDebtInfo(data);
+                                      setPayAmount(data.balance.toString());
+                                    } else {
+                                      setPayAmount(inv.amount.toString());
+                                    }
+                                  } catch (err) {
+                                    setPayAmount(inv.amount.toString());
+                                  } finally {
+                                    setLoadingDebt(false);
+                                  }
                                 }}
                               >
                                 Registrar Cobro
@@ -671,9 +707,41 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
 
             <form onSubmit={handleRegisterPayment} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div className="modal-body">
-                <FormAlert message={paymentFormError} />
-                <div className="form-group">
-                  <label>Monto Recibido ($ ARS) *</label>
+                {loadingDebt ? (
+                  <div style={{ textAlign: 'center', padding: '1.5rem 1rem' }}>
+                    <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--accent)', margin: '0 auto' }} />
+                    <p style={{ marginTop: '0.75rem', color: 'var(--text-muted)' }}>Calculando saldo y recargos...</p>
+                  </div>
+                ) : (
+                  <>
+                    {debtInfo && (debtInfo.moraAmount > 0 || debtInfo.totalPayments > 0) && (
+                      <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: 'var(--bg-tertiary)', borderRadius: '4px', borderLeft: '3px solid var(--accent)' }}>
+                        <h4 style={{ fontSize: '0.85rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>Desglose de Deuda</h4>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                          <span>Monto Original:</span>
+                          <span>${debtInfo.activeTotal} ARS</span>
+                        </div>
+                        {debtInfo.moraAmount > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                            <span>Interés por Mora ({debtInfo.daysLate} días):</span>
+                            <span>${debtInfo.moraAmount} ARS</span>
+                          </div>
+                        )}
+                        {debtInfo.totalPayments > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                            <span>Pagos Anteriores:</span>
+                            <span style={{ color: 'var(--color-success)' }}>-${debtInfo.totalPayments} ARS</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
+                          <span>Saldo a Pagar:</span>
+                          <span>${debtInfo.balance} ARS</span>
+                        </div>
+                      </div>
+                    )}
+                    <FormAlert message={paymentFormError} />
+                    <div className="form-group">
+                      <label>Monto Recibido ($ ARS) *</label>
                   <input type="number" className={(!payAmount || parseFloat(payAmount) <= 0) && paymentFormError ? "input-error" : ""} value={payAmount} onChange={e => { setPayAmount(e.target.value); if (paymentFormError) setPaymentFormError(""); }} />
                 </div>
 
@@ -719,6 +787,8 @@ const Billing: React.FC<BillingProps> = ({ token, userRole }) => {
                     Reactivar servicio en MikroTik al registrar este pago
                   </label>
                 )}
+              </>
+              )}
               </div>
 
               <div className="modal-footer">
