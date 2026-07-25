@@ -246,6 +246,24 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
   // Edit client form fields
   const [editDni, setEditDni] = useState('');
   const [editClientCode, setEditClientCode] = useState('');
+  const [generatingDni, setGeneratingDni] = useState(false);
+  const generateTempDni = async () => {
+    try {
+      setGeneratingDni(true);
+      const res = await fetch('/api/clients/generate-temp-dni', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEditDni(data.dni);
+        if (editFormError) setEditFormError('');
+      }
+    } catch (e) {
+      showToast('No se pudo generar el DNI temporal', 'warning');
+    } finally {
+      setGeneratingDni(false);
+    }
+  };
   const [editPhone1, setEditPhone1] = useState('');
   const [editPhone2, setEditPhone2] = useState('');
   const [editEmail, setEditEmail] = useState('');
@@ -987,6 +1005,27 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
         <ArrowLeft size={16} /> Volver a Clientes
       </Link>
 
+      {client && client.dni.startsWith('TEMP-') && (
+        <div style={{
+          backgroundColor: 'rgba(234, 179, 8, 0.12)',
+          border: '1px solid rgba(234, 179, 8, 0.45)',
+          borderRadius: '6px',
+          padding: '1rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem'
+        }}>
+          <AlertTriangle size={22} color="var(--color-warning)" />
+          <div>
+            <strong style={{ color: 'var(--color-warning)', display: 'block', marginBottom: '0.2rem', fontSize: '0.95rem' }}>Cliente con DNI Temporal</strong>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Este cliente fue registrado con un DNI temporal (<strong>{client.dni}</strong>) por falta de información. Recordá solicitarle el DNI definitivo y editar sus datos.
+            </span>
+          </div>
+        </div>
+      )}
+
       {reactivatedWithDebt && hasUnpaidInvoices && (
         <div style={{
           backgroundColor: 'rgba(249,115,22,0.12)',
@@ -1145,7 +1184,13 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
               {/* Row 1: Name and ID */}
               <div>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.25rem' }}>{client.fullName}</h2>
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {client.dni} • Código: {client.clientCode || 'N/A'} • ID: {client.id.slice(0,8)}</span>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  DNI: {client.dni.startsWith('TEMP-') ? (
+                    <span style={{ color: 'var(--color-warning)', fontWeight: 'bold' }}>Temporal ({client.dni})</span>
+                  ) : (
+                    client.dni
+                  )} • Código: {client.clientCode || 'N/A'} • ID: {client.id.slice(0,8)}
+                </span>
               </div>
               
               {/* Row 2: Status Badges */}
@@ -2604,7 +2649,32 @@ const ClientDetail: React.FC<ClientDetailProps> = ({ token, userRole }) => {
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" className={!editDni && editFormError ? "input-error" : ""} placeholder="DNI sin puntos" value={editDni} onChange={e => { setEditDni(e.target.value); if (editFormError) setEditFormError(""); }} />
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <input 
+                        type="text" 
+                        className={!editDni && editFormError ? "input-error" : ""} 
+                        placeholder="DNI (o temporal)" 
+                        value={editDni} 
+                        onChange={e => { setEditDni(e.target.value); if (editFormError) setEditFormError(""); }} 
+                        style={{ flex: 1, minWidth: '0' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={generateTempDni}
+                        disabled={generatingDni}
+                        title="Generar DNI temporal"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                          padding: '0.5rem 0.6rem', borderRadius: '8px', cursor: 'pointer',
+                          background: 'var(--accent)', color: '#fff', border: 'none',
+                          fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
+                          opacity: generatingDni ? 0.7 : 1,
+                        }}
+                      >
+                        <Shuffle size={12} />
+                        Temp
+                      </button>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>

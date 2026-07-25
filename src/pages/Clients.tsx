@@ -130,6 +130,26 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
       setGeneratingCode(false);
     }
   };
+
+  const [generatingDni, setGeneratingDni] = useState(false);
+  const generateTempDni = async () => {
+    try {
+      setGeneratingDni(true);
+      const res = await fetchWithRetry('/api/clients/generate-temp-dni', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDni(data.dni);
+        if (formError) setFormError('');
+      }
+    } catch (e) {
+      showToast('No se pudo generar el DNI temporal', 'warning');
+    } finally {
+      setGeneratingDni(false);
+    }
+  };
+
   const [fullName, setFullName] = useState('');
   const [dni, setDni] = useState('');
   const [phone1, setPhone1] = useState('');
@@ -527,7 +547,11 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                       </div>
                     )}
                     <div className="mobile-only" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.25rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
-                      DNI: {client.dni} <br />
+                      DNI: {client.dni.startsWith('TEMP-') ? (
+                        <span style={{ color: '#eab308', fontWeight: 'bold' }}>Temporal</span>
+                      ) : (
+                        client.dni
+                      )} <br />
                       Tel: {client.phone1 || 'Sin contacto'} <br />
                       Dir: {client.address} <br />
                       {client.contracts && client.contracts.length > 0 ? (
@@ -545,7 +569,15 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                       )}
                     </div>
                   </td>
-                  <td data-label="DNI" className="desktop-only">{client.dni}</td>
+                  <td data-label="DNI" className="desktop-only">
+                    {client.dni.startsWith('TEMP-') ? (
+                      <span className="badge" style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '0.1rem 0.3rem', fontSize: '0.72rem' }}>
+                        Temporal
+                      </span>
+                    ) : (
+                      client.dni
+                    )}
+                  </td>
                   <td data-label="Contacto" className="desktop-only">{client.phone1 || client.email || 'Sin contacto'}</td>
                   <td data-label="Conexión" className="desktop-only" style={{ fontSize: '0.82rem', fontFamily: 'monospace', lineHeight: 1.3 }}>
                     {client.contracts && client.contracts.length > 0 ? (
@@ -748,7 +780,15 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
               <div className="mobile-card-body">
                 <div className="mobile-card-row">
                   <div className="mobile-card-label">DNI</div>
-                  <div className="mobile-card-value">{client.dni}</div>
+                  <div className="mobile-card-value">
+                    {client.dni.startsWith('TEMP-') ? (
+                      <span className="badge" style={{ backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)', padding: '0.1rem 0.3rem', fontSize: '0.72rem' }}>
+                        Temporal
+                      </span>
+                    ) : (
+                      client.dni
+                    )}
+                  </div>
                 </div>
                 <div className="mobile-card-row">
                   <div className="mobile-card-label">Contacto</div>
@@ -841,7 +881,32 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                 <div className="grid grid-cols-2" style={{ gap: '1rem' }}>
                   <div className="form-group">
                     <label>DNI *</label>
-                    <input type="text" className={!dni && formError ? "input-error" : ""} placeholder="DNI sin puntos" value={dni} onChange={(e) => { setDni(e.target.value); if (formError) setFormError(""); }} />
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <input 
+                        type="text" 
+                        className={!dni && formError ? "input-error" : ""} 
+                        placeholder="DNI (o temporal)" 
+                        value={dni} 
+                        onChange={(e) => { setDni(e.target.value); if (formError) setFormError(""); }} 
+                        style={{ flex: 1, minWidth: '0' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={generateTempDni}
+                        disabled={generatingDni}
+                        title="Generar DNI temporal"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.3rem',
+                          padding: '0.5rem 0.6rem', borderRadius: '8px', cursor: 'pointer',
+                          background: 'var(--accent)', color: '#fff', border: 'none',
+                          fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
+                          opacity: generatingDni ? 0.7 : 1,
+                        }}
+                      >
+                        <Shuffle size={12} />
+                        Temp
+                      </button>
+                    </div>
                   </div>
                   <div className="form-group">
                     <label>Código de Cliente *</label>
