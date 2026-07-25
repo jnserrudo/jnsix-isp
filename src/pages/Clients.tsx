@@ -903,8 +903,12 @@ const Clients: React.FC<ClientsProps> = ({ token, userRole }) => {
                           opacity: generatingDni ? 0.7 : 1,
                         }}
                       >
-                        <Shuffle size={12} />
-                        Temp
+                        {generatingDni ? (
+                          <RefreshCw size={12} className="animate-spin" />
+                        ) : (
+                          <Shuffle size={12} />
+                        )}
+                        {generatingDni ? 'Generando...' : 'Temp'}
                       </button>
                     </div>
                   </div>
